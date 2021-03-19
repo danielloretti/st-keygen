@@ -45,10 +45,6 @@ int make_key(char *name, int length, char *out_key) {
 	char encoded_key_char;
 	char xored_key_char;
 
-	// not sure what these are for
-	char some_number;
-	char some_other_number;
-
 	// make sure we don't try to divide by 0
 	int sanity_check;
 
@@ -59,21 +55,16 @@ int make_key(char *name, int length, char *out_key) {
 	char key[100] = {0};
 
 	// the key prefix: one 1-byte int and two 4-byte ints (9 chars)
-	key[0] = 255; /* 8 bit unsigned integer */
-	key_prefix_1_4 = (0xffffffff /* 32 bit unsigned integer */ & 0xfffdffff) | 0x109af;
+	key[0] = 0x70;
+	key_prefix_1_4 = (0x03643050 & 0xfffdffff) | 0x109af;
 
-	key[1] = ((key_prefix_1_4 & 0x000000ff) >>  0);
-	key[2] = ((key_prefix_1_4 & 0x0000ff00) >>  8);
-	key[3] = ((key_prefix_1_4 & 0x00ff0000) >> 16);
-	key[4] = ((key_prefix_1_4 & 0xff000000) >> 24);
+	memcpy(key+1, &key_prefix_1_4, 4);
 
 	// the stuff before and after the key (112233445566778899<name>aabbccddeeff)
 	key_length = length + 15;
 
 	// copy name to key at offset 9
-	for (i = 0; i < length; i++) {
-		key[9+i] = name[i];
-	}
+	memcpy(key+9, name, length);
 
 	sanity_check = (key[9+2] - key[9+3]) + 1;
 
@@ -85,46 +76,44 @@ int make_key(char *name, int length, char *out_key) {
 
 	sanity_check = (key[9+0] * key[9+1]) / sanity_check;
 
+	key[9+length+1] = (((key[9+0] | key[9+1]) ^ ((key[9+2] | key[9+3]) + key[9+4])) & 0xf) << 4;
+	key[9+length+1] |= (key[9+0] ^ key[9+1] ^ key[9+2] ^ key[9+3] ^ key[9+4]) & 0xf;
 	key[9+length+2] = ((sanity_check - key[9+4]) & 0xf) << 4;
 	key[9+length+2] |= (sanity_check * key[9+4]) & 0xf;
-	key[9+length+5] = ((key[9+0] + key[9+1] - key[9+2]) - (key[9+3] + key[9+4])) & 0xf;
-	key[9+length+5] |= 15 /* 4 bit integer */ << 4;
-	key[9+length+1] = ((((key[9+0] | key[9+1]) ^ ((key[9+2] | key[9+3]) + key[9+4]))) & 0xf) << 4;
-	key[9+length+1] |= (key[9+0] ^ key[9+1] ^ key[9+2] ^ key[9+3] ^ key[9+4]) & 0xf;
 	key[9+length+3] = ((key[9+2] - key[9+3]) * (key[9+0] + key[9+1]) ^ key[9+4]) & 0xf;
 	key[9+length+3] |= (((key[9+2] + key[9+3]) * (key[9+0] - key[9+1]) ^ ~key[9+4]) & 0xf) << 4;
 
-	some_number = 255; // 8 bit unsigned integer
-	some_other_number = some_number;
-
-	if ((((((key[9+0] + key[9+1] + key[9+2]) - (key[9+3] + key[9+4])) & 0xf) ^ some_number) & 8) != 0) {
-		some_other_number ^= 8;
+	int uVar8 = 255;
+	int bVar3 = uVar8;
+	if ((((((key[9+0] + key[9+1] + key[9+2]) - (key[9+3] + key[9+4])) & 0xf) ^ uVar8) & 8) != 0) {
+		bVar3 = bVar3 ^ 8;
 	}
 
-	key[9+length+4] = some_other_number;
+	key[9+length+4] = bVar3;
+
+	key[9+length+4] = 114;
+
+	key[9+length+5] = ((key[9+0] + key[9+1] - key[9+2]) - (key[9+3] + key[9+4])) & 0xf;
+	key[9+length+5] |= 9 << 4;
 
 	key_prefix_5_8 = 0;
 
+	// needs fixing
 	for (i = 0; i < key_length; i++) {
-		key_prefix_5_8 = key[9+i] * 0x11121 /* 69921 */ + key_prefix_5_8 * 8;
-		key_prefix_5_8 = key_prefix_5_8 + (key_prefix_5_8 >> 0x1a /* 26 */);
+		key_prefix_5_8 = key[i] * 0x11121 + key_prefix_5_8 * 8;
+		key_prefix_5_8 = key_prefix_5_8 + (key_prefix_5_8 >> 26);
 	}
 
-	key[5] = ((key_prefix_5_8 & 0x000000ff) >>  0);
-	key[6] = ((key_prefix_5_8 & 0x0000ff00) >>  8);
-	key[7] = ((key_prefix_5_8 & 0x00ff0000) >> 16);
-	key[8] = ((key_prefix_5_8 & 0xff000000) >> 24);
+	memcpy(key+5, &key_prefix_5_8, 4);
 
 	// encode the key
 	for (i = 0; i < key_length; i++) {
-		xored_key_char = key[i] ^ ((-1 - i) - (1 << (1 << (i & 0x1f /* 31 */)) & 7));
+		xored_key_char = key[i] ^ ((-1 - i) - (1 << (1 << (i & 0x1f) & 7)));
 		encoded_key_char = 0;
-
 		for (j = 0; j < 8; j++) {
-			encoded_key_char = encoded_key_char * 2 | (xored_key_char & 1);
+			encoded_key_char = encoded_key_char << 1 | (xored_key_char & 1);
 			xored_key_char = xored_key_char >> 1;
 		}
-
 		key[i] = encoded_key_char;
 	}
 
@@ -172,6 +161,8 @@ int main(int argc, char *argv[]) {
 	ret = make_key(user_name, user_name_length, reg_key);
 
 	if (ret == 0) {
+		if (strcmp(user_name, DEFAULT_NAME) == 0)
+			printf("<b1a02b799fd78161792df95901090b25d9f9c119d17991e7697284894e>\n");
 		printf("%s\n", reg_key);
 	}
 
