@@ -22,6 +22,8 @@
  * recognized, but the unregistered message still plays every 12 hours.
  */
 
+#define DEBUG
+
 #include <stdio.h>
 #include <string.h>
 
@@ -51,22 +53,27 @@ int make_key(char *name, int length, char *out_key) {
 	// key prefix chars 1-8 (skip 0)
 	unsigned int key_prefix_1_4, key_prefix_5_8;
 
-	int key_length;
+	// 15 = the stuff before and after the key (112233445566778899<name>aabbccddeeff)
+	int key_length = length + 15;
+
 	char key[100] = {0};
+
+	// the locations of the important parts
+	char *key_license	= key + 1; // licensed features
+	char *key_checksum	= key + 5; // not sure how this is calculated
+	char *key_body		= key + 9; // encoded name
+	char *key_trailer	= key + 9 + length; // extra stuff
 
 	// the key prefix: one 1-byte int and two 4-byte ints (9 chars)
 	key[0] = 0x70;
 	key_prefix_1_4 = (0x03643050 & 0xfffdffff) | 0x109af;
 
-	memcpy(key+1, &key_prefix_1_4, 4);
+	memcpy(key_license, &key_prefix_1_4, 4);
 
-	// the stuff before and after the key (112233445566778899<name>aabbccddeeff)
-	key_length = length + 15;
+	// copy name to key body
+	memcpy(key_body, name, length);
 
-	// copy name to key at offset 9
-	memcpy(key+9, name, length);
-
-	sanity_check = (key[9+2] - key[9+3]) + 1;
+	sanity_check = (key_body[2] - key_body[3]) + 1;
 
 	if (sanity_check == 0) {
 		// we can't divide by 0
@@ -74,45 +81,44 @@ int make_key(char *name, int length, char *out_key) {
 		return 1;
 	}
 
-	sanity_check = (key[9+0] * key[9+1]) / sanity_check;
+	sanity_check = (key_body[0] * key_body[1]) / sanity_check;
 
-	key[9+length+1] = (((key[9+0] | key[9+1]) ^ ((key[9+2] | key[9+3]) + key[9+4])) & 0xf) << 4;
-	key[9+length+1] |= (key[9+0] ^ key[9+1] ^ key[9+2] ^ key[9+3] ^ key[9+4]) & 0xf;
-	key[9+length+2] = ((sanity_check - key[9+4]) & 0xf) << 4;
-	key[9+length+2] |= (sanity_check * key[9+4]) & 0xf;
-	key[9+length+3] = ((key[9+2] - key[9+3]) * (key[9+0] + key[9+1]) ^ key[9+4]) & 0xf;
-	key[9+length+3] |= (((key[9+2] + key[9+3]) * (key[9+0] - key[9+1]) ^ ~key[9+4]) & 0xf) << 4;
+	key_trailer[1] = (((key_body[0] | key_body[1]) ^ ((key_body[2] | key_body[3]) + key_body[4])) & 0xf) << 4;
+	key_trailer[1] |= (key_body[0] ^ key_body[1] ^ key_body[2] ^ key_body[3] ^ key_body[4]) & 0xf;
+	key_trailer[2] = ((sanity_check - key_body[4]) & 0xf) << 4;
+	key_trailer[2] |= (sanity_check * key_body[4]) & 0xf;
+	key_trailer[3] = ((key_body[2] - key_body[3]) * (key_body[0] + key_body[1]) ^ key_body[4]) & 0xf;
+	key_trailer[3] |= (((key_body[2] + key_body[3]) * (key_body[0] - key_body[1]) ^ ~key_body[4]) & 0xf) << 4;
 
 	int uVar8 = 255;
 	int bVar3 = uVar8;
-	if ((((((key[9+0] + key[9+1] + key[9+2]) - (key[9+3] + key[9+4])) & 0xf) ^ uVar8) & 8) != 0) {
+	if ((((((key_body[0] + key_body[1] + key_body[2]) - (key_body[3] + key_body[4])) & 0xf) ^ uVar8) & 8) != 0) {
 		bVar3 = bVar3 ^ 8;
 	}
 
-	key[9+length+4] = bVar3;
+	key_trailer[4] = bVar3;
+	key_trailer[4] = 114;
 
-	key[9+length+4] = 114;
-
-	key[9+length+5] = ((key[9+0] + key[9+1] - key[9+2]) - (key[9+3] + key[9+4])) & 0xf;
-	key[9+length+5] |= 9 << 4;
+	key_trailer[5] = ((key_body[0] + key_body[1] - key_body[2]) - (key_body[3] + key_body[4])) & 0xf;
+	key_trailer[5] |= 9 << 4;
 
 	key_prefix_5_8 = 0;
 
 	// needs fixing
 	for (i = 0; i < key_length; i++) {
-		key_prefix_5_8 = key[i] * 0x11121 + key_prefix_5_8 * 8;
-		key_prefix_5_8 = key_prefix_5_8 + (key_prefix_5_8 >> 26);
+		key_prefix_5_8 = key[i] * 0x11121 + (key_prefix_5_8 << 3);
+		key_prefix_5_8 += (key_prefix_5_8 >> 26);
 	}
 
-	memcpy(key+5, &key_prefix_5_8, 4);
+	memcpy(key_checksum, &key_prefix_5_8, 4);
 
 	// encode the key
 	for (i = 0; i < key_length; i++) {
 		xored_key_char = key[i] ^ ((-1 - i) - (1 << (1 << (i & 0x1f) & 7)));
 		encoded_key_char = 0;
 		for (j = 0; j < 8; j++) {
-			encoded_key_char = encoded_key_char << 1 | (xored_key_char & 1);
-			xored_key_char = xored_key_char >> 1;
+			encoded_key_char = (encoded_key_char << 1) | (xored_key_char & 1);
+			xored_key_char >>= 1;
 		}
 		key[i] = encoded_key_char;
 	}
@@ -120,11 +126,28 @@ int make_key(char *name, int length, char *out_key) {
 	out_key[0] = '<';
 
 	for (i = 0; i < key_length; i++) {
+#ifdef DEBUG
+		if (i == 1) {
+			strcat(out_key, "\x1b[1;35m");
+		}
+		if (i == 5) {
+			strcat(out_key, "\x1b[1;36m");
+		}
+#endif
 		sprintf(key_char_byte, "%.2x", key[i]);
+#ifdef DEBUG
+		if (i == 9) {
+			strcat(out_key, "\x1b[0;0m");
+		}
+#endif
 		strcat(out_key, key_char_byte);
 	}
 
-	out_key[1+key_length*2] = '>';
+#ifdef DEBUG
+	out_key[key_length*2+1+20] = '>';
+#else
+	out_key[key_length*2+1] = '>';
+#endif
 
 	return 0;
 }
@@ -140,7 +163,7 @@ int main(int argc, char *argv[]) {
 
 	if (argc < 2) {
 		strcpy(user_name, DEFAULT_NAME);
-		printf("Using default name \"" DEFAULT_NAME "\".\n");
+		printf("Using default name \"%s\".\n", DEFAULT_NAME);
 	} else {
 		strncpy(user_name, argv[1], 50);
 		printf("Using name \"%s\".\n", user_name);
