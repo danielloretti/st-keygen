@@ -22,22 +22,24 @@
  * recognized, but the unregistered message still plays every 12 hours.
  */
 
-#define DEBUG
-
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
+
+// set to 1 for colored output
+#define DEBUG		0
+
+// max name length
+#define MAXLEN		40
 
 // the default name to use when none is specified
-#define DEFAULT_NAME "Akira Kurosawa"
+#define DEFAULT_NAME	"Akira Kurosawa"
 
-/*
- * <23a06b710bde7407f92df95901090b25d9f9c119d17991e7697284ad40>
- * <30a00368d7df8aad392df95901090b25d9f9c119d17991e76972848447>
- * <49a02768375e833d592df95901090b25d9f9c119d17991e7697284c44e>
- * <b1a02b799fd78161792df95901090b25d9f9c119d17991e7697284894e>
-*/
+// not sure how these are calculated
+#define FEATURE_BYTE	0x6f
+#define FEATURE_INT	0x16ec0050
 
-int make_key(char *name, int length, char *out_key) {
+int make_key(char *name, char *out_key) {
 	int i, j;
 
 	// hex representation of one byte (2 chars + terminator)
@@ -51,12 +53,16 @@ int make_key(char *name, int length, char *out_key) {
 	int sanity_check;
 
 	// key prefix chars 1-8 (skip 0)
-	unsigned int key_prefix_1_4, key_prefix_5_8;
+	int key_prefix_1_4, key_prefix_5_8;
+
+	// the length of the name
+	int length = strlen(name);
 
 	// 15 = the stuff before and after the key (112233445566778899<name>aabbccddeeff)
 	int key_length = length + 15;
 
-	char key[100] = {0};
+	char key[MAXLEN*2];
+	memset(key, 0, MAXLEN*2);
 
 	// the locations of the important parts
 	char *key_license	= key + 1; // licensed features
@@ -65,10 +71,10 @@ int make_key(char *name, int length, char *out_key) {
 	char *key_trailer	= key + 9 + length; // extra stuff
 
 	// the key prefix: one 1-byte int and two 4-byte ints (9 chars)
-	key[0] = 0x70;
-	key_prefix_1_4 = (0x03643050 & 0xfffdffff) | 0x109af;
+	key[0] = FEATURE_BYTE;
+	key_prefix_1_4 = (FEATURE_INT & 0xfffdffff) | 0x109af;
 
-	memcpy(key_license, &key_prefix_1_4, 4);
+	memcpy(key_license, &key_prefix_1_4, sizeof(int));
 
 	// copy name to key body
 	memcpy(key_body, name, length);
@@ -90,27 +96,25 @@ int make_key(char *name, int length, char *out_key) {
 	key_trailer[3] = ((key_body[2] - key_body[3]) * (key_body[0] + key_body[1]) ^ key_body[4]) & 0xf;
 	key_trailer[3] |= (((key_body[2] + key_body[3]) * (key_body[0] - key_body[1]) ^ ~key_body[4]) & 0xf) << 4;
 
-	int uVar8 = 255;
+	int uVar8 = 192; // how is this calculated?
 	int bVar3 = uVar8;
-	if ((((((key_body[0] + key_body[1] + key_body[2]) - (key_body[3] + key_body[4])) & 0xf) ^ uVar8) & 8) != 0) {
+	if ((((key_body[0] + key_body[1] + key_body[2] - key_body[3] + key_body[4]) & 0xf) ^ uVar8) & 8) {
 		bVar3 = bVar3 ^ 8;
 	}
 
 	key_trailer[4] = bVar3;
-	key_trailer[4] = 114;
 
 	key_trailer[5] = ((key_body[0] + key_body[1] - key_body[2]) - (key_body[3] + key_body[4])) & 0xf;
 	key_trailer[5] |= 9 << 4;
 
 	key_prefix_5_8 = 0;
 
-	// needs fixing
 	for (i = 0; i < key_length; i++) {
 		key_prefix_5_8 = key[i] * 0x11121 + (key_prefix_5_8 << 3);
-		key_prefix_5_8 += (key_prefix_5_8 >> 26);
+		key_prefix_5_8 += key_prefix_5_8 >> 26;
 	}
 
-	memcpy(key_checksum, &key_prefix_5_8, 4);
+	memcpy(key_checksum, &key_prefix_5_8, sizeof(int));
 
 	// encode the key
 	for (i = 0; i < key_length; i++) {
@@ -126,7 +130,10 @@ int make_key(char *name, int length, char *out_key) {
 	out_key[0] = '<';
 
 	for (i = 0; i < key_length; i++) {
-#ifdef DEBUG
+#if DEBUG
+		if (i == 0) {
+			strcat(out_key, "\x1b[1;34m");
+		}
 		if (i == 1) {
 			strcat(out_key, "\x1b[1;35m");
 		}
@@ -135,7 +142,7 @@ int make_key(char *name, int length, char *out_key) {
 		}
 #endif
 		sprintf(key_char_byte, "%.2x", key[i]);
-#ifdef DEBUG
+#if DEBUG
 		if (i == 9) {
 			strcat(out_key, "\x1b[0;0m");
 		}
@@ -143,8 +150,8 @@ int make_key(char *name, int length, char *out_key) {
 		strcat(out_key, key_char_byte);
 	}
 
-#ifdef DEBUG
-	out_key[key_length*2+1+20] = '>';
+#if DEBUG
+	out_key[key_length*2+1+27] = '>';
 #else
 	out_key[key_length*2+1] = '>';
 #endif
@@ -155,17 +162,18 @@ int make_key(char *name, int length, char *out_key) {
 int main(int argc, char *argv[]) {
 	int ret;
 
-	char user_name[50] = {0};
+	char user_name[MAXLEN];
 	int user_name_length;
 
 	// registration key
-	char reg_key[200] = {0};
+	char reg_key[MAXLEN*4];
+	memset(reg_key, 0, MAXLEN*4);
 
 	if (argc < 2) {
 		strcpy(user_name, DEFAULT_NAME);
 		printf("Using default name \"%s\".\n", DEFAULT_NAME);
 	} else {
-		strncpy(user_name, argv[1], 50);
+		strncpy(user_name, argv[1], MAXLEN);
 		printf("Using name \"%s\".\n", user_name);
 	}
 
@@ -176,16 +184,14 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	if (user_name_length > 32) {
+	if (user_name_length == MAXLEN) {
 		fprintf(stderr, "Name is too long.\n");
 		return 1;
 	}
 
-	ret = make_key(user_name, user_name_length, reg_key);
+	ret = make_key(user_name, reg_key);
 
 	if (ret == 0) {
-		if (strcmp(user_name, DEFAULT_NAME) == 0)
-			printf("<b1a02b799fd78161792df95901090b25d9f9c119d17991e7697284894e>\n");
 		printf("%s\n", reg_key);
 	}
 
