@@ -24,172 +24,185 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
-
-// set to 1 for colored output
-#define DEBUG		0
+#include <getopt.h>
+#include <stdlib.h>
 
 // max name length
-#define MAXLEN		40
+#define MAXLEN		64
 
 // the default name to use when none is specified
 #define DEFAULT_NAME	"Akira Kurosawa"
 
 // not sure how these are calculated
-#define FEATURE_BYTE	0x6f
-#define FEATURE_INT	0x16ec0050
+#define FEATURE_BYTE	0xff
+#define FEATURE_INT	0xffffbfff
 
-int make_key(char *name, char *out_key) {
-	int i, j;
-
+int make_key(char *name, char *out_key, unsigned int features) {
 	// hex representation of one byte (2 chars + terminator)
-	char key_char_byte[3];
+	char key_byte[3];
 
-	// needs better names
-	char encoded_key_char;
-	char xored_key_char;
+	// key checksum
+	int checksum;
 
 	// make sure we don't try to divide by 0
-	int sanity_check;
-
-	// key prefix chars 1-8 (skip 0)
-	int key_prefix_1_4, key_prefix_5_8;
+	int div_check;
 
 	// the length of the name
-	int length = strlen(name);
+	int len = strlen(name);
 
 	// 15 = the stuff before and after the key (112233445566778899<name>aabbccddeeff)
-	int key_length = length + 15;
+	int key_len = len + 15;
 
-	char key[MAXLEN*2];
-	memset(key, 0, MAXLEN*2);
+	char *key;
+	key = malloc(key_len*2+3);
+	memset(key, 0, key_len*2+3);
 
 	// the locations of the important parts
-	char *key_license	= key + 1; // licensed features
+	char *key_features	= key + 1; // licensed features
 	char *key_checksum	= key + 5; // not sure how this is calculated
-	char *key_body		= key + 9; // encoded name
-	char *key_trailer	= key + 9 + length; // extra stuff
+	char *key_name		= key + 9; // display name
+	char *key_trailer	= key_name + len; // extra stuff
 
 	// the key prefix: one 1-byte int and two 4-byte ints (9 chars)
 	key[0] = FEATURE_BYTE;
-	key_prefix_1_4 = (FEATURE_INT & 0xfffdffff) | 0x109af;
 
-	memcpy(key_license, &key_prefix_1_4, sizeof(int));
+	memcpy(key_features, &features, sizeof(int));
 
 	// copy name to key body
-	memcpy(key_body, name, length);
+	memcpy(key_name, name, len);
 
-	sanity_check = (key_body[2] - key_body[3]) + 1;
+	div_check = (key_name[2] - key_name[3]) + 1;
 
-	if (sanity_check == 0) {
+	if (div_check == 0) {
 		// we can't divide by 0
 		fprintf(stderr, "Invalid name.\n");
 		return 1;
 	}
 
-	sanity_check = (key_body[0] * key_body[1]) / sanity_check;
+	div_check = (key_name[0] * key_name[1]) / div_check;
 
-	key_trailer[1] = (((key_body[0] | key_body[1]) ^ ((key_body[2] | key_body[3]) + key_body[4])) & 0xf) << 4;
-	key_trailer[1] |= (key_body[0] ^ key_body[1] ^ key_body[2] ^ key_body[3] ^ key_body[4]) & 0xf;
-	key_trailer[2] = ((sanity_check - key_body[4]) & 0xf) << 4;
-	key_trailer[2] |= (sanity_check * key_body[4]) & 0xf;
-	key_trailer[3] = ((key_body[2] - key_body[3]) * (key_body[0] + key_body[1]) ^ key_body[4]) & 0xf;
-	key_trailer[3] |= (((key_body[2] + key_body[3]) * (key_body[0] - key_body[1]) ^ ~key_body[4]) & 0xf) << 4;
+	key_trailer[1] = (((key_name[0] | key_name[1]) ^ ((key_name[2] | key_name[3]) + key_name[4])) & 0xf) << 4;
+	key_trailer[1] |= (key_name[0] ^ key_name[1] ^ key_name[2] ^ key_name[3] ^ key_name[4]) & 0xf;
+	key_trailer[2] = ((div_check - key_name[4]) & 0xf) << 4;
+	key_trailer[2] |= (div_check * key_name[4]) & 0xf;
+	key_trailer[3] = ((key_name[2] - key_name[3]) * (key_name[0] + key_name[1]) ^ key_name[4]) & 0xf;
+	key_trailer[3] |= (((key_name[2] + key_name[3]) * (key_name[0] - key_name[1]) ^ ~key_name[4]) & 0xf) << 4;
 
 	int uVar8 = 192; // how is this calculated?
 	int bVar3 = uVar8;
-	if ((((key_body[0] + key_body[1] + key_body[2] - key_body[3] + key_body[4]) & 0xf) ^ uVar8) & 8) {
-		bVar3 = bVar3 ^ 8;
+	if ((((key_name[0] + key_name[1] + key_name[2] - key_name[3] + key_name[4]) & 0xf) ^ uVar8) & 8) {
+		bVar3 ^= 8;
 	}
 
 	key_trailer[4] = bVar3;
 
-	key_trailer[5] = ((key_body[0] + key_body[1] - key_body[2]) - (key_body[3] + key_body[4])) & 0xf;
-	key_trailer[5] |= 9 << 4;
+	key_trailer[5] = ((key_name[0] + key_name[1] - key_name[2]) - (key_name[3] + key_name[4])) & 0xf;
+	key_trailer[5] |= 15 << 4;
 
-	key_prefix_5_8 = 0;
+	checksum = 0;
 
-	for (i = 0; i < key_length; i++) {
-		key_prefix_5_8 = key[i] * 0x11121 + (key_prefix_5_8 << 3);
-		key_prefix_5_8 += key_prefix_5_8 >> 26;
+	// calculate the checksum
+	for (int i = 0; i < key_len; i++) {
+		checksum = key[i] * 0x11121 + (checksum << 3);
+		checksum += checksum >> 26;
 	}
 
-	memcpy(key_checksum, &key_prefix_5_8, sizeof(int));
+	memcpy(key_checksum, &checksum, sizeof(int));
 
 	// encode the key
-	for (i = 0; i < key_length; i++) {
-		xored_key_char = key[i] ^ ((-1 - i) - (1 << (1 << (i & 0x1f) & 7)));
-		encoded_key_char = 0;
-		for (j = 0; j < 8; j++) {
-			encoded_key_char = (encoded_key_char << 1) | (xored_key_char & 1);
-			xored_key_char >>= 1;
+	char tmp1, tmp2;
+	for (int i = 0; i < key_len; i++) {
+		tmp1 = key[i] ^ ((-1 - i) - (1 << (1 << (i & 31) & 7)));
+		tmp2 = 0;
+		for (int j = 0; j < 8; j++) {
+			tmp2 <<= 1;
+			tmp2 |= tmp1 & 1;
+			tmp1 >>= 1;
 		}
-		key[i] = encoded_key_char;
+		key[i] = tmp2;
 	}
 
 	out_key[0] = '<';
 
-	for (i = 0; i < key_length; i++) {
-#if DEBUG
-		if (i == 0) {
-			strcat(out_key, "\x1b[1;34m");
-		}
-		if (i == 1) {
-			strcat(out_key, "\x1b[1;35m");
-		}
-		if (i == 5) {
-			strcat(out_key, "\x1b[1;36m");
-		}
-#endif
-		sprintf(key_char_byte, "%.2x", key[i]);
-#if DEBUG
-		if (i == 9) {
-			strcat(out_key, "\x1b[0;0m");
-		}
-#endif
-		strcat(out_key, key_char_byte);
+	for (int i = 0; i < key_len; i++) {
+		sprintf(key_byte, "%.2x", key[i]);
+		strcat(out_key, key_byte);
 	}
 
-#if DEBUG
-	out_key[key_length*2+1+27] = '>';
-#else
-	out_key[key_length*2+1] = '>';
-#endif
+	out_key[key_len*2+1] = '>';
+
+	free(key);
 
 	return 0;
 }
 
 int main(int argc, char *argv[]) {
+	int opt;
 	int ret;
+	unsigned int features = FEATURE_INT;
+	int name_len;
+	int default_name = 1;
+	int default_features = 1;
 
-	char user_name[MAXLEN];
-	int user_name_length;
+	char name[MAXLEN];
+	char reg_key[MAXLEN*4] = {0};
 
-	// registration key
-	char reg_key[MAXLEN*4];
-	memset(reg_key, 0, MAXLEN*4);
+	const char *short_opt = "n:f:h";
+	const struct option long_opt[] = {
+		{"name",	required_argument,	NULL,	'n'},
+		{"features",	required_argument,	NULL,	'f'},
+		{"help",	no_argument,		NULL,	'h'},
+		{0,		0,			0,	0}
+	};
 
-	if (argc < 2) {
-		strcpy(user_name, DEFAULT_NAME);
-		printf("Using default name \"%s\".\n", DEFAULT_NAME);
-	} else {
-		strncpy(user_name, argv[1], MAXLEN);
-		printf("Using name \"%s\".\n", user_name);
+	while ((opt = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
+		switch (opt) {
+			case 'n':
+				strncpy(name, optarg, MAXLEN);
+				printf("Using name \"%s\".\n", name);
+				default_name = 0;
+				break;
+			case 'f':
+				features = strtoul(optarg, NULL, 16);
+				printf("Using custom feature config (0x%08x)\n", features);
+				default_features = 0;
+				break;
+			case 'h':
+			case '?':
+			default:
+				fprintf(stderr,
+					"Stereo Tool key generator\n"
+					"\n"
+					"Usage: %s [ -n name ] [ -f features ]\n"
+					"\n",
+				argv[0]);
+				return 1;
+		}
 	}
 
-	user_name_length = strlen(user_name);
+	if (default_name) {
+		strcpy(name, DEFAULT_NAME);
+		printf("Using default name \"%s\".\n", DEFAULT_NAME);
+	}
 
-	if (user_name_length < 5) {
-		fprintf(stderr, "Name must be at least 5 chars long.\n");
+	if (default_features) {
+		printf("Using default features (0x%08x)\n", features);
+	}
+
+	// input validation
+	name_len = strlen(name);
+
+	if (name_len < 5) {
+		fprintf(stderr, "Name must be at least 5 characters long.\n");
 		return 1;
 	}
 
-	if (user_name_length == MAXLEN) {
+	if (name_len == MAXLEN) {
 		fprintf(stderr, "Name is too long.\n");
 		return 1;
 	}
 
-	ret = make_key(user_name, reg_key);
+	ret = make_key(name, reg_key, features);
 
 	if (ret == 0) {
 		printf("%s\n", reg_key);
