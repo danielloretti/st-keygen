@@ -1,2 +1,4 @@
 # st-keygen
-Keygen for Stereo Tool (WIP)
+Stereo Tool registration key maker
+
+To build, just run make.
