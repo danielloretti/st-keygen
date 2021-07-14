@@ -29,26 +29,24 @@
 #define DEFAULT_NAME	"Akira Kurosawa"
 
 // not sure how these are calculated
-#define FEATURE_BYTE	0xff
-#define FEATURE_INT	0xffffbfff
+#define FEATURE_1	0xff
+#define FEATURE_2	0xfff7bfff
 
 int main(int argc, char *argv[]) {
 	int opt;
-	unsigned int features = FEATURE_INT;
+	unsigned char features_1 = FEATURE_1;
+	unsigned int features_2 = FEATURE_2;
 	int name_len;
 	int default_name = 1;
 	int default_features = 1;
-	char name[MAXLEN];
-	char *key;
-	char *out_key;
-
+	int key_len;
+	// key checksum
+        int checksum;
+	char name[MAXLEN+1];
+	char key[(MAXLEN+1)*4];
+	char out_key[(MAXLEN+1)*4];
 	// hex representation of one byte (2 chars + terminator)
 	char out_key_byte[3];
-
-	int key_len;
-
-	// key checksum
-	int checksum;
 
 	const char *short_opt = "n:f:h";
 	const struct option long_opt[] = {
@@ -58,6 +56,10 @@ int main(int argc, char *argv[]) {
 		{0,		0,			0,	0}
 	};
 
+	memset(name, 0, MAXLEN+1);
+	memset(key, 0, (MAXLEN+1)*4);
+	memset(out_key, 0, (MAXLEN+1)*4);
+
 	while ((opt = getopt_long(argc, argv, short_opt, long_opt, NULL)) != -1) {
 		switch (opt) {
 			case 'n':
@@ -66,8 +68,8 @@ int main(int argc, char *argv[]) {
 				default_name = 0;
 				break;
 			case 'f':
-				features = strtoul(optarg, NULL, 16);
-				printf("Using custom feature config (0x%08x)\n", features);
+				features_2 = strtoul(optarg, NULL, 16);
+				printf("Using custom feature config (0x%08x)\n", features_2);
 				default_features = 0;
 				break;
 			case 'h':
@@ -88,10 +90,6 @@ int main(int argc, char *argv[]) {
 		printf("Using default name \"%s\".\n", DEFAULT_NAME);
 	}
 
-	if (default_features) {
-		printf("Using default features (0x%08x)\n", features);
-	}
-
 	// input validation
 	name_len = strlen(name);
 
@@ -100,18 +98,12 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	if (name_len == MAXLEN) {
-		fprintf(stderr, "Name is too long.\n");
-		return 1;
+	if (default_features) {
+		printf("Using default features (0x%08x)\n", features_2);
 	}
 
 	// 15 = the stuff before and after the key (112233445566778899<name>aabbccddeeff)
 	key_len = name_len + 15;
-
-	key = malloc(key_len*2);
-	out_key = malloc(key_len*2+3);
-	memset(key, 0, key_len*2);
-	memset(out_key, 0, key_len*2+3);
 
 	// the locations of the important parts
 	char *key_features	= key + 1; // licensed features
@@ -120,8 +112,8 @@ int main(int argc, char *argv[]) {
 	char *key_trailer	= key_name + name_len; // extra stuff
 
 	// registered options
-	key[0] = FEATURE_BYTE;
-	memcpy(key_features, &features, sizeof(int));
+	key[0] = features_1;
+	memcpy(key_features, &features_2, sizeof(int));
 
 	// copy name to key
 	memcpy(key_name, name, name_len);
@@ -185,9 +177,6 @@ int main(int argc, char *argv[]) {
 	out_key[key_len*2+1] = '>';
 
 	printf("%s\n", out_key);
-
-	free(key);
-	free(out_key);
 
 	return 0;
 }
