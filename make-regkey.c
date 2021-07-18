@@ -29,26 +29,45 @@
 #define DEFAULT_NAME	"Akira Kurosawa"
 
 // not sure how these are calculated
-#define FEATURE_1	0xff
-#define FEATURE_2	0xfff7bfff
+#define FEATURES	0xffffffff ^ (1 << 14 | 1 << 19)
+// bits 4 and 19 need to be clear to make umpx and natural dynamics work
+
+static void dump_bit8(unsigned char value) {
+	printf("%02x: ", value);
+	for (int i = 0; i < 8; i++) {
+		printf(((value >> (7 - i)) & 1) ? "1" : "0");
+		if (i == 3) printf(" ");
+	}
+	printf("\n");
+}
+static void dump_bit32(unsigned int value) {
+	printf("%08x: ", value);
+	for (int i = 0; i < 32; i++) {
+		printf(((value >> (31 - i)) & 1) ? "1" : "0");
+		if (i == 3 || i == 7 || i == 11 || i == 15 ||
+		    i == 19 || i == 23 || i == 27) printf(" ");
+	}
+	printf("\n");
+}
 
 int main(int argc, char *argv[]) {
 	int opt;
-	unsigned char features_1 = FEATURE_1;
-	unsigned int features_2 = FEATURE_2;
+	unsigned int features = FEATURES;
+	unsigned char unknown = 128;
 	int name_len;
 	int default_name = 1;
 	int default_features = 1;
+	int default_unknown = 1;
 	int key_len;
 	// key checksum
-        int checksum;
+	int checksum;
 	char name[MAXLEN+1];
 	char key[(MAXLEN+1)*4];
 	char out_key[(MAXLEN+1)*4];
 	// hex representation of one byte (2 chars + terminator)
 	char out_key_byte[3];
 
-	const char *short_opt = "n:f:h";
+	const char *short_opt = "n:f:u:h";
 	const struct option long_opt[] = {
 		{"name",	required_argument,	NULL,	'n'},
 		{"features",	required_argument,	NULL,	'f'},
@@ -68,9 +87,14 @@ int main(int argc, char *argv[]) {
 				default_name = 0;
 				break;
 			case 'f':
-				features_2 = strtoul(optarg, NULL, 16);
-				printf("Using custom feature config (0x%08x)\n", features_2);
+				features = strtoul(optarg, NULL, 16);
+				printf("Using custom feature config (0x%08x)\n", features);
 				default_features = 0;
+				break;
+			case 'u':
+				unknown = strtoul(optarg, NULL, 10);
+				printf("Using %d for unknown value.\n", unknown);
+				default_unknown = 0;
 				break;
 			case 'h':
 			case '?':
@@ -99,8 +123,15 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (default_features) {
-		printf("Using default features (0x%08x)\n", features_2);
+		printf("Using default features (0x%08x)\n", features);
 	}
+
+	if (default_unknown) {
+		printf("Using default unknown value %d.\n", unknown);
+	}
+
+	dump_bit8(unknown);
+	dump_bit32(features);
 
 	// 15 = the stuff before and after the key (112233445566778899<name>aabbccddeeff)
 	key_len = name_len + 15;
@@ -111,9 +142,10 @@ int main(int argc, char *argv[]) {
 	char *key_name		= key + 9; // display name
 	char *key_trailer	= key_name + name_len; // extra stuff
 
+	key[0] = 255; // doesn't seem to affect anything
+
 	// registered options
-	key[0] = features_1;
-	memcpy(key_features, &features_2, sizeof(int));
+	memcpy(key_features, &features, sizeof(int));
 
 	// copy name to key
 	memcpy(key_name, name, name_len);
@@ -131,21 +163,11 @@ int main(int argc, char *argv[]) {
 	key_trailer[2] |= ((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) * key_name[4]) & 0xf;
 	key_trailer[3] = ((key_name[2] - key_name[3]) * (key_name[0] + key_name[1]) ^ key_name[4]) & 0xf;
 	key_trailer[3] |= (((key_name[2] + key_name[3]) * (key_name[0] - key_name[1]) ^ ~key_name[4]) & 0xf) << 4;
-
-	int uVar8 = 192; // how is this calculated?
-	int bVar3 = uVar8;
-	if ((((key_name[0] + key_name[1] + key_name[2] - key_name[3] + key_name[4]) & 0xf) ^ uVar8) & 8) {
-		bVar3 ^= 8;
-	}
-
-	key_trailer[4] = bVar3;
-
+	key_trailer[4] = unknown; // how is this calculated?
 	key_trailer[5] = ((key_name[0] + key_name[1] - key_name[2]) - (key_name[3] + key_name[4])) & 0xf;
-	key_trailer[5] |= 15 << 4;
-
-	checksum = 0;
 
 	// calculate the checksum
+	checksum = 0;
 	for (int i = 0; i < key_len; i++) {
 		checksum = key[i] * 0x11121 + (checksum << 3);
 		checksum += checksum >> 26;
