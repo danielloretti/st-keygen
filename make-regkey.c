@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
 	// key checksum
 	int checksum;
 	char name[MAXLEN+1];
-	char key[(MAXLEN+1)*4];
+	unsigned char key[(MAXLEN+1)*4];
 	char out_key[(MAXLEN+1)*4];
 	// hex representation of one byte (2 chars + terminator)
 	char out_key_byte[3];
@@ -127,10 +127,10 @@ int main(int argc, char *argv[]) {
 	key_len = name_len + 15;
 
 	// the locations of the important parts
-	char *key_features	= key + 1; // licensed features
-	char *key_checksum	= key + 5; // not sure how this is calculated
-	char *key_name		= key + 9; // display name
-	char *key_trailer	= key_name + name_len; // extra stuff
+	unsigned char *key_features	= key + 1; // licensed features
+	unsigned char *key_checksum	= key + 5; // not sure how this is calculated
+	unsigned char *key_name		= key + 9; // display name
+	unsigned char *key_trailer	= key_name + name_len; // extra stuff
 
 	key[0] = 255; // doesn't seem to affect anything
 
