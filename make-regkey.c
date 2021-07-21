@@ -45,7 +45,6 @@ static void dump_bit32(unsigned int value) {
 int main(int argc, char *argv[]) {
 	int opt;
 	unsigned int features = FEATURES;
-	int unknown = 0;
 	int name_len;
 	int default_name = 1;
 	int default_features = 1;
@@ -58,11 +57,10 @@ int main(int argc, char *argv[]) {
 	// hex representation of one byte (2 chars + terminator)
 	char out_key_byte[3];
 
-	const char *short_opt = "n:f:uh";
+	const char *short_opt = "n:f:h";
 	const struct option long_opt[] = {
 		{"name",	required_argument,	NULL,	'n'},
 		{"features",	required_argument,	NULL,	'f'},
-		{"unknown",	no_argument,		NULL,	'u'},
 		{"help",	no_argument,		NULL,	'h'},
 		{0,		0,			0,	0}
 	};
@@ -83,21 +81,16 @@ int main(int argc, char *argv[]) {
 				printf("Using custom feature config (0x%08x)\n", features);
 				default_features = 0;
 				break;
-			case 'u':
-				printf("Setting bit 4.\n");
-				unknown = 1;
-				break;
 			case 'h':
 			case '?':
 			default:
 				fprintf(stderr,
 					"Stereo Tool key generator\n"
 					"\n"
-					"Usage: %s [ -n name ] [ -f features (hex) ] [ -u ]\n"
+					"Usage: %s [ -n name ] [ -f features (hex) ]\n"
 					"\n"
 					"\t-n name\t\tName of key (default name: %s)\n"
 					"\t-f features\tRegistered options in hexadecimal\n"
-					"\t-u\t\tSet bit 4 in key check (needed for some names)\n"
 					"\n",
 				argv[0], DEFAULT_NAME);
 				return 1;
@@ -130,7 +123,7 @@ int main(int argc, char *argv[]) {
 	unsigned char *key_features	= key + 1; // licensed features
 	unsigned char *key_checksum	= key + 5; // not sure how this is calculated
 	unsigned char *key_name		= key + 9; // display name
-	unsigned char *key_trailer	= key_name + name_len; // extra stuff
+	unsigned char *key_trailer	= key_name + name_len + 1; // extra stuff
 
 	key[0] = 255; // doesn't seem to affect anything
 
@@ -147,14 +140,13 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	key_trailer[1] = (((key_name[0] | key_name[1]) ^ ((key_name[2] | key_name[3]) + key_name[4])) & 0xf) << 4;
-	key_trailer[1] |= (key_name[0] ^ key_name[1] ^ key_name[2] ^ key_name[3] ^ key_name[4]) & 0xf;
-	key_trailer[2] = (((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) - key_name[4]) & 0xf) << 4;
-	key_trailer[2] |= ((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) * key_name[4]) & 0xf;
-	key_trailer[3] = ((key_name[2] - key_name[3]) * (key_name[0] + key_name[1]) ^ key_name[4]) & 0xf;
-	key_trailer[3] |= (((key_name[2] + key_name[3]) * (key_name[0] - key_name[1]) ^ ~key_name[4]) & 0xf) << 4;
-	key_trailer[4] = unknown ? 1 << 4 : 0; // how is this calculated?
-	key_trailer[5] = ((key_name[0] + key_name[1] - key_name[2]) - (key_name[3] + key_name[4])) & 0xf;
+	key_trailer[0] = (((key_name[0] | key_name[1]) ^ ((key_name[2] | key_name[3]) + key_name[4])) & 0xf) << 4;
+	key_trailer[0] |= (key_name[0] ^ key_name[1] ^ key_name[2] ^ key_name[3] ^ key_name[4]) & 0xf;
+	key_trailer[1] = (((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) - key_name[4]) & 0xf) << 4;
+	key_trailer[1] |= ((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) * key_name[4]) & 0xf;
+	key_trailer[2] = ((key_name[2] - key_name[3]) * (key_name[0] + key_name[1]) ^ key_name[4]) & 0xf;
+	key_trailer[2] |= (((key_name[2] + key_name[3]) * (key_name[0] - key_name[1]) ^ ~key_name[4]) & 0xf) << 4;
+	key_trailer[3] = (((key_name[0] + key_name[1] - key_name[2]) - (key_name[3] + key_name[4])) & 8) << 1;
 
 	// calculate the checksum
 	checksum = 0;
