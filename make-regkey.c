@@ -55,8 +55,6 @@ int main(int argc, char *argv[]) {
 	char name[MAXLEN+1];
 	unsigned char key[(MAXLEN+1)*4];
 	char out_key[(MAXLEN+1)*4];
-	// hex representation of one byte (2 chars + terminator)
-	char out_key_byte[3];
 
 	const char *short_opt = "n:f:uh";
 	const struct option long_opt[] = {
@@ -130,7 +128,7 @@ int main(int argc, char *argv[]) {
 	unsigned char *key_features	= key + 1; // licensed features
 	unsigned char *key_checksum	= key + 5; // not sure how this is calculated
 	unsigned char *key_name		= key + 9; // display name
-	unsigned char *key_trailer	= key_name + name_len; // extra stuff
+	unsigned char *key_trailer	= key_name + name_len + 1; // extra stuff
 
 	key[0] = 255; // doesn't seem to affect anything
 
@@ -147,14 +145,13 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	key_trailer[1] = (((key_name[0] | key_name[1]) ^ ((key_name[2] | key_name[3]) + key_name[4])) & 0xf) << 4;
-	key_trailer[1] |= (key_name[0] ^ key_name[1] ^ key_name[2] ^ key_name[3] ^ key_name[4]) & 0xf;
-	key_trailer[2] = (((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) - key_name[4]) & 0xf) << 4;
-	key_trailer[2] |= ((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) * key_name[4]) & 0xf;
-	key_trailer[3] = ((key_name[2] - key_name[3]) * (key_name[0] + key_name[1]) ^ key_name[4]) & 0xf;
-	key_trailer[3] |= (((key_name[2] + key_name[3]) * (key_name[0] - key_name[1]) ^ ~key_name[4]) & 0xf) << 4;
-	key_trailer[4] = unknown ? 1 << 4 : 0; // how is this calculated?
-	key_trailer[5] = ((key_name[0] + key_name[1] - key_name[2]) - (key_name[3] + key_name[4])) & 0xf;
+	key_trailer[0] = (((key_name[0] | key_name[1]) ^ ((key_name[2] | key_name[3]) + key_name[4])) & 0xf) << 4;
+	key_trailer[0] |= (key_name[0] ^ key_name[1] ^ key_name[2] ^ key_name[3] ^ key_name[4]) & 0xf;
+	key_trailer[1] = (((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) - key_name[4]) & 0xf) << 4;
+	key_trailer[1] |= ((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) * key_name[4]) & 0xf;
+	key_trailer[2] = ((key_name[2] - key_name[3]) * (key_name[0] + key_name[1]) ^ key_name[4]) & 0xf;
+	key_trailer[2] |= (((key_name[2] + key_name[3]) * (key_name[0] - key_name[1]) ^ ~key_name[4]) & 0xf) << 4;
+	key_trailer[3] = unknown ? 1 << 4 : 0; // how is this calculated?
 
 	// calculate the checksum
 	checksum = 0;
@@ -182,8 +179,7 @@ int main(int argc, char *argv[]) {
 	out_key[0] = '<';
 
 	for (int i = 0; i < key_len; i++) {
-		sprintf(out_key_byte, "%02x", key[i]);
-		strcat(out_key, out_key_byte);
+		sprintf(out_key+i*2+1, "%02x", key[i]);
 	}
 
 	out_key[key_len*2+1] = '>';
