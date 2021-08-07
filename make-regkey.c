@@ -32,6 +32,9 @@
 #define FEATURES	0xffffffff ^ (1 << 14 | 1 << 19)
 // bits 4 and 19 need to be clear to make umpx and natural dynamics work
 
+// the bits that need to be set int key_trailer[3] for some names
+#define UNKNOWN_BITS	((1 << 5) | (1 << 4)) // b4 + b5 = 48
+
 static void dump_bit32(unsigned int value) {
 	printf("%08x: ", value);
 	for (int i = 0; i < 32; i++) {
@@ -82,7 +85,7 @@ int main(int argc, char *argv[]) {
 				default_features = 0;
 				break;
 			case 'u':
-				printf("Setting bit 4.\n");
+				printf("Setting unknown bits.\n");
 				unknown = 1;
 				break;
 			case 'h':
@@ -95,7 +98,7 @@ int main(int argc, char *argv[]) {
 					"\n"
 					"\t-n name\t\tName of key (default name: %s)\n"
 					"\t-f features\tRegistered options in hexadecimal\n"
-					"\t-u\t\tSet bit 4 in key check (needed for some names)\n"
+					"\t-u\t\tSet unknown bits in key check (needed for some names)\n"
 					"\n",
 				argv[0], DEFAULT_NAME);
 				return 1;
@@ -151,7 +154,7 @@ int main(int argc, char *argv[]) {
 	key_trailer[1] |= ((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) * key_name[4]) & 0xf;
 	key_trailer[2] = ((key_name[2] - key_name[3]) * (key_name[0] + key_name[1]) ^ key_name[4]) & 0xf;
 	key_trailer[2] |= (((key_name[2] + key_name[3]) * (key_name[0] - key_name[1]) ^ ~key_name[4]) & 0xf) << 4;
-	key_trailer[3] = unknown ? 1 << 4 : 0; // how is this calculated?
+	key_trailer[3] = unknown ? UNKNOWN_BITS : 0; // how is this calculated?
 
 	// calculate the checksum
 	checksum = 0;
