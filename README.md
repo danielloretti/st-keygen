@@ -10,6 +10,5 @@ Usage: ./make-regkey [ -n name ] [ -f features (hex) ] [ -u ]
 
 	-n name		Name of key (default name: Akira Kurosawa)
 	-f features	Registered options in hexadecimal
-	-u		Set unknown bits in key check (needed for some names)
 
 ```

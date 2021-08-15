@@ -30,10 +30,7 @@
 
 // not sure how these are calculated
 #define FEATURES	0xffffffff ^ (1 << 14 | 1 << 19)
-// bits 4 and 19 need to be clear to make umpx and natural dynamics work
-
-// the bits that need to be set int key_trailer[3] for some names
-#define UNKNOWN_BITS	((1 << 5) | (1 << 4)) // b4 + b5 = 48
+// bits 14 and 19 need to be clear to make umpx and natural dynamics work
 
 static void dump_bit32(unsigned int value) {
 	printf("%08x: ", value);
@@ -48,7 +45,6 @@ static void dump_bit32(unsigned int value) {
 int main(int argc, char *argv[]) {
 	int opt;
 	unsigned int features = FEATURES;
-	int unknown = 0;
 	int name_len;
 	int default_name = 1;
 	int default_features = 1;
@@ -59,11 +55,10 @@ int main(int argc, char *argv[]) {
 	unsigned char key[(MAXLEN+1)*4];
 	char out_key[(MAXLEN+1)*4];
 
-	const char *short_opt = "n:f:uh";
+	const char *short_opt = "n:f:h";
 	const struct option long_opt[] = {
 		{"name",	required_argument,	NULL,	'n'},
 		{"features",	required_argument,	NULL,	'f'},
-		{"unknown",	no_argument,		NULL,	'u'},
 		{"help",	no_argument,		NULL,	'h'},
 		{0,		0,			0,	0}
 	};
@@ -84,10 +79,6 @@ int main(int argc, char *argv[]) {
 				printf("Using custom feature config (0x%08x)\n", features);
 				default_features = 0;
 				break;
-			case 'u':
-				printf("Setting unknown bits.\n");
-				unknown = 1;
-				break;
 			case 'h':
 			case '?':
 			default:
@@ -98,7 +89,6 @@ int main(int argc, char *argv[]) {
 					"\n"
 					"\t-n name\t\tName of key (default name: %s)\n"
 					"\t-f features\tRegistered options in hexadecimal\n"
-					"\t-u\t\tSet unknown bits in key check (needed for some names)\n"
 					"\n",
 				argv[0], DEFAULT_NAME);
 				return 1;
@@ -154,7 +144,8 @@ int main(int argc, char *argv[]) {
 	key_trailer[1] |= ((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) * key_name[4]) & 0xf;
 	key_trailer[2] = ((key_name[2] - key_name[3]) * (key_name[0] + key_name[1]) ^ key_name[4]) & 0xf;
 	key_trailer[2] |= (((key_name[2] + key_name[3]) * (key_name[0] - key_name[1]) ^ ~key_name[4]) & 0xf) << 4;
-	key_trailer[3] = unknown ? UNKNOWN_BITS : 0; // how is this calculated?
+	key_trailer[3] = (((key_name[0] + key_name[1] + key_name[2]) - key_name[3]) - key_name[4]) & 0xf;
+	key_trailer[3] |= ((((key_name[0] ^ key_name[1]) + (key_name[2] ^ key_name[3])) ^ key_name[4]) & 0xf) << 4;
 
 	// calculate the checksum
 	checksum = 0;
