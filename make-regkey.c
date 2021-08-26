@@ -22,6 +22,8 @@
 #include <getopt.h>
 #include <stdlib.h>
 
+//#define DUMP_BITS
+
 // max name length
 #define MAXLEN		64
 
@@ -32,15 +34,15 @@
 #define FEATURES	0xffffffff ^ (1 << 14 | 1 << 19)
 // bits 14 and 19 need to be clear to make umpx and natural dynamics work
 
+#ifdef DUMP_BITS
 static void dump_bit32(unsigned int value) {
-	printf("%08x: ", value);
+	char bitbuf[32] = "00000000000000000000000000000000";
 	for (int i = 0; i < 32; i++) {
-		printf(((value >> (31 - i)) & 1) ? "1" : "0");
-		if (i == 3 || i == 7 || i == 11 || i == 15 ||
-		    i == 19 || i == 23 || i == 27) printf(" ");
+		if ((value >> (31 - i)) & 1) bitbuf[i] = '1';
 	}
-	printf("\n");
+	printf("%08x: %s\n", value, bitbuf);
 }
+#endif
 
 int main(int argc, char *argv[]) {
 	int opt;
@@ -85,7 +87,7 @@ int main(int argc, char *argv[]) {
 				fprintf(stderr,
 					"Stereo Tool key generator\n"
 					"\n"
-					"Usage: %s [ -n name ] [ -f features (hex) ] [ -u ]\n"
+					"Usage: %s [ -n name ] [ -f features (hex) ]\n"
 					"\n"
 					"\t-n name\t\tName of key (default name: %s)\n"
 					"\t-f features\tRegistered options in hexadecimal\n"
@@ -108,11 +110,20 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	// make sure we don't try to divide by 0
+	if ((name[2] - name[3]) + 1 == 0) {
+		// we can't divide by 0
+		fprintf(stderr, "Invalid name.\n");
+		return 1;
+	}
+
 	if (default_features) {
 		printf("Using default features (0x%08x)\n", features);
 	}
 
+#ifdef DUMP_BITS
 	dump_bit32(features);
+#endif
 
 	// 15 = the stuff before and after the key (112233445566778899<name>aabbccddeeff)
 	key_len = name_len + 15;
@@ -131,21 +142,15 @@ int main(int argc, char *argv[]) {
 	// copy name to key
 	memcpy(key_name, name, name_len);
 
-	// make sure we don't try to divide by 0
-	if ((key_name[2] - key_name[3]) + 1 == 0) {
-		// we can't divide by 0
-		fprintf(stderr, "Invalid name.\n");
-		return 1;
-	}
-
-	key_trailer[0] = (((key_name[0] | key_name[1]) ^ ((key_name[2] | key_name[3]) + key_name[4])) & 0xf) << 4;
-	key_trailer[0] |= (key_name[0] ^ key_name[1] ^ key_name[2] ^ key_name[3] ^ key_name[4]) & 0xf;
-	key_trailer[1] = (((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) - key_name[4]) & 0xf) << 4;
-	key_trailer[1] |= ((key_name[0] * key_name[1]) / ((key_name[2] - key_name[3]) + 1) * key_name[4]) & 0xf;
-	key_trailer[2] = ((key_name[2] - key_name[3]) * (key_name[0] + key_name[1]) ^ key_name[4]) & 0xf;
-	key_trailer[2] |= (((key_name[2] + key_name[3]) * (key_name[0] - key_name[1]) ^ ~key_name[4]) & 0xf) << 4;
-	key_trailer[3] = (((key_name[0] + key_name[1] + key_name[2]) - key_name[3]) - key_name[4]) & 0xf;
-	key_trailer[3] |= ((((key_name[0] ^ key_name[1]) + (key_name[2] ^ key_name[3])) ^ key_name[4]) & 0xf) << 4;
+	// the algorithm as found on ghidra
+	key_trailer[0] = (((name[0] | name[1]) ^ ((name[2] | name[3]) + name[4])) & 0xf) << 4;
+	key_trailer[0] |= (name[0] ^ name[1] ^ name[2] ^ name[3] ^ name[4]) & 0xf;
+	key_trailer[1] = (((name[0] * name[1]) / ((name[2] - name[3]) + 1) - name[4]) & 0xf) << 4;
+	key_trailer[1] |= ((name[0] * name[1]) / ((name[2] - name[3]) + 1) * name[4]) & 0xf;
+	key_trailer[2] = (((name[2] + name[3]) * (name[0] - name[1]) ^ ~name[4]) & 0xf) << 4;
+	key_trailer[2] |= ((name[2] - name[3]) * (name[0] + name[1]) ^ name[4]) & 0xf;
+	key_trailer[3] = ((((name[0] ^ name[1]) + (name[2] ^ name[3])) ^ name[4]) & 0xf) << 4;
+	key_trailer[3] |= (name[0] + name[1] + name[2] - name[3] - name[4]) & 0xf;
 
 	// calculate the checksum
 	checksum = 0;
@@ -170,6 +175,7 @@ int main(int argc, char *argv[]) {
 		key[i] = tmp2;
 	}
 
+	// output
 	out_key[0] = '<';
 
 	for (int i = 0; i < key_len; i++) {

@@ -6,7 +6,7 @@ To build, just run make.
 ```
 Stereo Tool key generator
 
-Usage: ./make-regkey [ -n name ] [ -f features (hex) ] [ -u ]
+Usage: ./make-regkey [ -n name ] [ -f features (hex) ]
 
 	-n name		Name of key (default name: Akira Kurosawa)
 	-f features	Registered options in hexadecimal
