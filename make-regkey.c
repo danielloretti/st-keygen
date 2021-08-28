@@ -105,6 +105,8 @@ int main(int argc, char *argv[]) {
 	name_len = strlen(name);
 
 	// input validation
+
+	// needed for name validation
 	if (name_len < 5) {
 		fprintf(stderr, "Name must be at least 5 characters long.\n");
 		return 1;
@@ -130,9 +132,9 @@ int main(int argc, char *argv[]) {
 
 	// the locations of the important parts
 	unsigned char *key_features	= key + 1; // licensed features
-	unsigned char *key_checksum	= key + 5; // not sure how this is calculated
+	unsigned char *key_checksum	= key + 5;
 	unsigned char *key_name		= key + 9; // display name
-	unsigned char *key_trailer	= key_name + name_len + 1; // extra stuff
+	unsigned char *key_trailer	= key_name + name_len + 1; // name validation
 
 	key[0] = 255; // doesn't seem to affect anything
 
