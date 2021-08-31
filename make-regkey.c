@@ -30,9 +30,15 @@
 // the default name to use when none is specified
 #define DEFAULT_NAME	"Akira Kurosawa"
 
-// not sure how these are calculated
-#define FEATURES	0xffffffff ^ (1 << 14 | 1 << 19)
-// bits 14 and 19 need to be clear to make umpx and natural dynamics work
+// feature mask
+#define FEATURES	0xffffffff ^ (1 << 14 | 1 << 19 | 1 << 28)
+/*
+ * bits that need to be clear
+ *
+ * 14: natural dynamics
+ * 19: umpx
+ * 28: umpx+
+ */
 
 #ifdef DUMP_BITS
 static void dump_bit32(unsigned int value) {
