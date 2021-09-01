@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
 	unsigned char *key_name		= key + 9; // display name
 	unsigned char *key_trailer	= key_name + name_len + 1; // name validation
 
-	key[0] = 255; // doesn't seem to affect anything
+	key[0] = 1; // doesn't seem to affect anything
 
 	// registered options
 	memcpy(key_features, &features, sizeof(int));
