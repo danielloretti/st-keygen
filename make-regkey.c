@@ -31,13 +31,12 @@
 #define DEFAULT_NAME	"Akira Kurosawa"
 
 // feature mask
-#define FEATURES	0xffffffff ^ (1 << 14 | 1 << 19 | 1 << 28)
+#define FEATURES	0x00ffffff ^ (1 << 14 | 1 << 19)
 /*
  * bits that need to be clear
  *
  * 14: natural dynamics
  * 19: umpx
- * 28: umpx+
  */
 
 #ifdef DUMP_BITS
@@ -133,8 +132,11 @@ int main(int argc, char *argv[]) {
 	dump_bit32(features);
 #endif
 
-	// 15 = the stuff before and after the key (112233445566778899<name>aabbccddeeff)
-	key_len = name_len + 15;
+	/*
+	 * 18 = the stuff before and after the key (112233445566778899<name>00aabbccddeeffaabb)
+	 * 14 (9 + name_len + 1 + 4) is the bare minimum
+	 */
+	key_len = 9 + name_len + 1 /* null terminator for name string */ + 8;
 
 	// the locations of the important parts
 	unsigned char *key_features	= key + 1; // licensed features
@@ -159,6 +161,12 @@ int main(int argc, char *argv[]) {
 	key_trailer[2] |= ((name[2] - name[3]) * (name[0] + name[1]) ^ name[4]) & 0xf;
 	key_trailer[3] = ((((name[0] ^ name[1]) + (name[2] ^ name[3])) ^ name[4]) & 0xf) << 4;
 	key_trailer[3] |= (name[0] + name[1] + name[2] - name[3] - name[4]) & 0xf;
+#if 0 // these are not determined yet
+	key_trailer[4] = 0;
+	key_trailer[5] = 0;
+	key_trailer[6] = 0;
+	key_trailer[7] = 0;
+#endif
 
 	// calculate the checksum
 	checksum = 0;
