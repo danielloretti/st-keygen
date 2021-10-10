@@ -31,13 +31,8 @@
 #define DEFAULT_NAME	"Akira Kurosawa"
 
 // feature mask
-#define FEATURES	0x00ffffff ^ (1 << 14 | 1 << 19)
-/*
- * bits that need to be clear
- *
- * 14: natural dynamics
- * 19: umpx
- */
+#define FEATURES	0x00e788d3
+// some bits need to be clear for composite clipper to be activated properly
 
 #ifdef DUMP_BITS
 static void dump_bit32(unsigned int value) {
