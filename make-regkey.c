@@ -30,17 +30,39 @@
 // the default name to use when none is specified
 #define DEFAULT_NAME	"Akira Kurosawa"
 
+// known features
+#define FEATURE_ADV_CLIPPER	0x00000002
+#define FEATURE_ADVANCED_RDS	0x00000010
+#define FEATURE_FILE_POLLING	0x00000040
+#define FEATURE_LOW_LAT_MON	0x00000080
+#define FEATURE_DECLIPPER	0x00000800
+#define FEATURE_DECLIPPER_2H	0x00001000
+#define FEATURE_EVENT_FM_PROC	0x00008000
+#define FEATURE_FM_PROC		0x00008000 | 0x00000001
+#define FEATURE_COMP_CLIP	0x00010000 | 0x00020000
+#define FEATURE_DELOSSIFIER	0x00040000
+#define FEATURE_UMPX_DISABLE	0x00080000
+#define FEATURE_AGC34_AEQ	0x00200000
+#define FEATURE_DYN_SPEED	0x00400000
+#define FEATURE_BIMP		0x00800000
+#define FEATURE_UMPXP_DISABLE	0x10000000
+
 // feature mask
-#define FEATURES	0x00e788d3
-// some bits need to be clear for composite clipper to be activated properly
+#define FEATURES	FEATURE_ADV_CLIPPER | FEATURE_ADVANCED_RDS | \
+			FEATURE_FILE_POLLING | FEATURE_LOW_LAT_MON | \
+			FEATURE_DECLIPPER | FEATURE_FM_PROC | \
+			FEATURE_COMP_CLIP | FEATURE_DELOSSIFIER | \
+			FEATURE_AGC34_AEQ | FEATURE_DYN_SPEED | FEATURE_BIMP
 
 #ifdef DUMP_BITS
 static void dump_bit32(unsigned int value) {
-	char bitbuf[32] = "00000000000000000000000000000000";
-	for (int i = 0; i < 32; i++) {
-		if ((value >> (31 - i)) & 1) bitbuf[i] = '1';
+	for (int i = 0; i < 8; i++) {
+		printf(" %d | %d %d %d %d\n", 7 - i,
+			value >> (31 - (i * 4 + 0)) & 1,
+			value >> (31 - (i * 4 + 1)) & 1,
+			value >> (31 - (i * 4 + 2)) & 1,
+			value >> (31 - (i * 4 + 3)) & 1);
 	}
-	printf("%08x: %s\n", value, bitbuf);
 }
 #endif
 
