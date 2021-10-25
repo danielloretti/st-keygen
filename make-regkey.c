@@ -27,32 +27,45 @@
 // max name length
 #define MAXLEN		64
 
-// the default name to use when none is specified
-#define DEFAULT_NAME	"Akira Kurosawa"
+// uncomment for event FM license (3 days)
+//#define EVENT_FM
 
 // known features
-#define FEATURE_ADV_CLIPPER	0x00000002
+#define FEATURE_FM_PROC		(0x00000001 | 0x00000004 | 0x00000008)
+#define FEATURE_ADV_CLIPPER	0x00000002 // also enables dehummer
 #define FEATURE_ADVANCED_RDS	0x00000010
+#define FEATURE_DEHUMMER_ONLY	0x00000020
 #define FEATURE_FILE_POLLING	0x00000040
 #define FEATURE_LOW_LAT_MON	0x00000080
 #define FEATURE_DECLIPPER	0x00000800
 #define FEATURE_DECLIPPER_2H	0x00001000
+#define FEATURE_NAT_DYNAMICS	0x00004000 // not set when declipper is enabled
 #define FEATURE_EVENT_FM_PROC	0x00008000
-#define FEATURE_FM_PROC		0x00008000 | 0x00000001
-#define FEATURE_COMP_CLIP	0x00010000 | 0x00020000
+#define FEATURE_COMP_CLIP	0x00010000
+#define FEATURE_EVENT_COMP_CLIP	(0x00010000 | 0x00020000)
 #define FEATURE_DELOSSIFIER	0x00040000
 #define FEATURE_UMPX_DISABLE	0x00080000
 #define FEATURE_AGC34_AEQ	0x00200000
-#define FEATURE_DYN_SPEED	0x00400000
+#define FEATURE_DYN_SPEEDS	0x00400000
 #define FEATURE_BIMP		0x00800000
 #define FEATURE_UMPXP_DISABLE	0x10000000
 
+#ifdef EVENT_FM
+#define FEATURE_FM	FEATURE_EVENT_FM_PROC | \
+			FEATURE_ADVANCED_RDS | \
+			FEATURE_EVENT_COMP_CLIP
+#else
+#define FEATURE_FM	FEATURE_FM_PROC | \
+			FEATURE_ADVANCED_RDS | \
+			FEATURE_COMP_CLIP
+#endif
+
 // feature mask
-#define FEATURES	FEATURE_ADV_CLIPPER | FEATURE_ADVANCED_RDS | \
-			FEATURE_FILE_POLLING | FEATURE_LOW_LAT_MON | \
-			FEATURE_DECLIPPER | FEATURE_FM_PROC | \
-			FEATURE_COMP_CLIP | FEATURE_DELOSSIFIER | \
-			FEATURE_AGC34_AEQ | FEATURE_DYN_SPEED | FEATURE_BIMP
+#define FEATURES	FEATURE_ADV_CLIPPER | FEATURE_FILE_POLLING | \
+			FEATURE_LOW_LAT_MON | FEATURE_FM | \
+			FEATURE_DECLIPPER | FEATURE_DELOSSIFIER | \
+			FEATURE_AGC34_AEQ | FEATURE_DYN_SPEEDS | \
+			FEATURE_BIMP
 
 #ifdef DUMP_BITS
 static void dump_bit32(unsigned int value) {
@@ -70,7 +83,7 @@ int main(int argc, char *argv[]) {
 	int opt;
 	unsigned int features = FEATURES;
 	int name_len;
-	int default_name = 1;
+	int name_set = 0;
 	int default_features = 1;
 	int key_len;
 	// key checksum
@@ -96,7 +109,7 @@ int main(int argc, char *argv[]) {
 			case 'n':
 				strncpy(name, optarg, MAXLEN);
 				printf("Using name \"%s\".\n", name);
-				default_name = 0;
+				name_set = 1;
 				break;
 			case 'f':
 				features = strtoul(optarg, NULL, 16);
@@ -109,19 +122,19 @@ int main(int argc, char *argv[]) {
 				fprintf(stderr,
 					"Stereo Tool key generator\n"
 					"\n"
-					"Usage: %s [ -n name ] [ -f features (hex) ]\n"
+					"Usage: %s -n name [ -f features (hex) ]\n"
 					"\n"
-					"\t-n name\t\tName of key (default name: %s)\n"
+					"\t-n name\t\tName to use for key (required)\n"
 					"\t-f features\tRegistered options in hexadecimal\n"
 					"\n",
-				argv[0], DEFAULT_NAME);
+				argv[0]);
 				return 1;
 		}
 	}
 
-	if (default_name) {
-		strcpy(name, DEFAULT_NAME);
-		printf("Using default name \"%s\".\n", DEFAULT_NAME);
+	if (!name_set) {
+		printf("Please specify a name.\n");
+		return 1;
 	}
 
 	name_len = strlen(name);
@@ -196,28 +209,24 @@ int main(int argc, char *argv[]) {
 	memcpy(key_checksum, &checksum, sizeof(int));
 
 	// encode the key
-	char tmp1, tmp2;
+	char in, out;
 	for (int i = 0; i < key_len; i++) {
-		tmp1 = key[i] ^ ((-1 - i) - (1 << (1 << (i & 31) & 7)));
-		tmp2 = 0;
+		in = key[i] ^ ((-1 - i) - (1 << (1 << (i & 31) & 7)));
+		out = 0;
 		for (int j = 0; j < 8; j++) {
-			tmp2 <<= 1;
-			tmp2 |= tmp1 & 1;
-			tmp1 >>= 1;
+			out <<= 1;
+			out |= in & 1;
+			in >>= 1;
 		}
-		key[i] = tmp2;
+		key[i] = out;
 	}
 
 	// output
-	out_key[0] = '<';
-
 	for (int i = 0; i < key_len; i++) {
-		sprintf(out_key+i*2+1, "%02x", key[i]);
+		sprintf(out_key+i*2, "%02x", key[i]);
 	}
 
-	out_key[key_len*2+1] = '>';
-
-	printf("%s\n", out_key);
+	printf("<%s>\n", out_key);
 
 	return 0;
 }
