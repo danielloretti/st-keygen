@@ -118,10 +118,6 @@ int main(int argc, char *argv[]) {
 		{0,		0,			0,	0}
 	};
 
-	memset(name, 0, MAXLEN+1);
-	memset(key, 0, 9+MAXLEN+1+8);
-	memset(out_key_text, 0, (9+MAXLEN+1+8)*2);
-
 keep_parsing_opts:
 
 	opt = getopt_long(argc, argv, short_opt, long_opt, NULL);
@@ -205,21 +201,29 @@ done_parsing_opts:
 	/* copy name to key */
 	memcpy(key_name, name, name_len);
 
+	/* add terminator */
+	(key_name + name_len)[0] = 0;
+
 	/* the algorithm as found on ghidra */
-	key_trailer[0] = (((name[0] | name[1]) ^ ((name[2] | name[3]) + name[4])) & 0xf) << 4;
-	key_trailer[0] |= (name[0] ^ name[1] ^ name[2] ^ name[3] ^ name[4]) & 0xf;
-	key_trailer[1] = (((name[0] * name[1]) / ((name[2] - name[3]) + 1) - name[4]) & 0xf) << 4;
-	key_trailer[1] |= ((name[0] * name[1]) / ((name[2] - name[3]) + 1) * name[4]) & 0xf;
-	key_trailer[2] = (((name[2] + name[3]) * (name[0] - name[1]) ^ ~name[4]) & 0xf) << 4;
-	key_trailer[2] |= ((name[2] - name[3]) * (name[0] + name[1]) ^ name[4]) & 0xf;
-	key_trailer[3] = ((((name[0] ^ name[1]) + (name[2] ^ name[3])) ^ name[4]) & 0xf) << 4;
-	key_trailer[3] |= (name[0] + name[1] + name[2] - name[3] - name[4]) & 0xf;
-#if 0 /* these are not determined yet */
-	key_trailer[4] = 0;
-	key_trailer[5] = 0;
-	key_trailer[6] = 0;
-	key_trailer[7] = 0;
-#endif
+	key_trailer_plain[0] = (((name[0] | name[1]) ^ ((name[2] | name[3]) + name[4])) & 0xf) << 4;
+	key_trailer_plain[0] |= (name[0] ^ name[1] ^ name[2] ^ name[3] ^ name[4]) & 0xf;
+	key_trailer_plain[1] = (((name[0] * name[1]) / ((name[2] - name[3]) + 1) - name[4]) & 0xf) << 4;
+	key_trailer_plain[1] |= ((name[0] * name[1]) / ((name[2] - name[3]) + 1) * name[4]) & 0xf;
+	key_trailer_plain[2] = (((name[2] + name[3]) * (name[0] - name[1]) ^ ~name[4]) & 0xf) << 4;
+	key_trailer_plain[2] |= ((name[2] - name[3]) * (name[0] + name[1]) ^ name[4]) & 0xf;
+	key_trailer_plain[3] = ((((name[0] ^ name[1]) + (name[2] ^ name[3])) ^ name[4]) & 0xf) << 4;
+	key_trailer_plain[3] |= (name[0] + name[1] + name[2] - name[3] - name[4]) & 0xf;
+	/* these are not determined yet */
+	key_trailer_plain[4] = 0;
+	key_trailer_plain[5] = 0;
+	key_trailer_plain[6] = 0;
+	key_trailer_plain[7] = 0;
+
+	/* copy the key trailer before scrambling */
+	memcpy(key_trailer, key_trailer_plain, 8);
+
+	/* clear checksum field */
+	memset(key_checksum, 0, sizeof(int));
 
 	/* calculate the checksum */
 	checksum = 0;
@@ -231,17 +235,11 @@ done_parsing_opts:
 	/* copy the checksum */
 	memcpy(key_checksum, &checksum, sizeof(int));
 
-	/* copy the key trailer before scrambling */
-	for (int i = 0; i < 8; i++) {
-		key_trailer_plain[i] = key_trailer[i];
-	}
-
 	/* scramble the key */
 	scrambler(key, key_len);
 
-	for (int i = 0; i < key_len; i++) {
+	for (int i = 0; i < key_len; i++)
 		sprintf(out_key_text+i*2, "%02x", key[i]);
-	}
 
 	/* output */
 	printf("\n");

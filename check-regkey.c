@@ -22,8 +22,22 @@
 #include <getopt.h>
 #include <stdlib.h>
 
+/*#define DUMP_BITS*/
+
 /* max name length */
 #define MAXLEN		108
+
+#ifdef DUMP_BITS
+static void dump_bit32(unsigned int value) {
+	for (int i = 0; i < 8; i++) {
+		printf(" %d | %d %d %d %d\n", 7 - i,
+			value >> (31 - (i * 4 + 0)) & 1,
+			value >> (31 - (i * 4 + 1)) & 1,
+			value >> (31 - (i * 4 + 2)) & 1,
+			value >> (31 - (i * 4 + 3)) & 1);
+	}
+}
+#endif
 
 static char ascii2nibble(char ascii) {
 	char nibble = ascii;
@@ -57,9 +71,9 @@ static void scrambler(char *key, size_t length) {
 
 int main(int argc, char *argv[]) {
 	int opt;
-	char key[256];
+	char key[9+MAXLEN+1+8];
 	char *key_ascii;
-	unsigned int features;
+	int features;
 	int key_checksum, checksum;
 	char *key_name;
 	char *key_trailer;
@@ -69,8 +83,8 @@ int main(int argc, char *argv[]) {
 
 	const char *short_opt = "h";
 	const struct option long_opt[] = {
-		{"help",	no_argument,		NULL,	'h'},
-		{0,		0,			0,	0}
+		{"help",	no_argument,	NULL,	'h'},
+		{0,		0,		0,	0}
 	};
 
 keep_parsing_opts:
@@ -104,9 +118,8 @@ done_parsing_opts:
 		return 1;
 	}
 
-	if (optind < argc) {
+	if (optind < argc)
 		key_ascii = argv[optind];
-	}
 
 	if (key_ascii[0] == '<')
 		key_ascii++;
@@ -129,6 +142,7 @@ done_parsing_opts:
 	/* get length */
 	key_len = j;
 
+	/* get name */
 	key_name = key + 9;
 
 	/* unscramble */
@@ -137,15 +151,19 @@ done_parsing_opts:
 	/* get the key feature bitmask */
 	memcpy(&features, key + 1, 4);
 
+#ifdef DUMP_BITS
+	dump_bit32(features);
+#endif
+
 	/* get checksum */
 	memcpy(&key_checksum, key + 5, 4);
 
-	/* zero the checksum field */
-	key[5] = key[6] = key[7] = key[8] = 0;
+	/* clear checksum field */
+	memset(key + 5, 0, 4);
 
 	/* calculate checksum */
 	checksum = 0;
-	for (int i = 0; i < key_len; i++) {
+	for (i = 0; i < key_len; i++) {
 		checksum = key[i] * 0x11121 + (checksum << 3);
 		checksum += checksum >> 26;
 	}
@@ -160,7 +178,6 @@ done_parsing_opts:
 	/* output results */
 	printf("\n");
 	printf("==========================================\n");
-	printf("Start byte\t: 0x%02x\n", key[0]);
 	printf("Name\t\t: %s\n", key_name);
 	printf("Features\t: 0x%08x\n", features);
 	printf("Calc'd checksum\t: 0x%08x\n", checksum);
