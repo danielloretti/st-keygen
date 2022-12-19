@@ -47,17 +47,26 @@
 #define FEATURE_AGC34_AEQ	0x00200000
 #define FEATURE_DYN_SPEEDS	0x00400000
 #define FEATURE_BIMP		0x00800000
+#define FEATURE_UMPX_SFN_GPS	0x01000000
 #define FEATURE_UMPXP		0x10000000 /* disabled when FM and this are set */
+#define FEATURE_PPM_WTRMRKNG	0x40000000
+
+/* ST-Enterprise */
+#define STE_PROC		0x08000000
 
 #ifdef EVENT_FM
 #define FEATURE_FM	FEATURE_EVENT_FM_PROC | \
 			FEATURE_ADVANCED_RDS | \
 			FEATURE_COMP_CLIP | \
-			FEATURE_COMP_CLIP_EVENT
+			FEATURE_COMP_CLIP_EVENT | \
+			FEATURE_UMPX_SFN_GPS | \
+			FEATURE_PPM_WTRMRKNG
 #else
 #define FEATURE_FM	FEATURE_FM_PROC | \
 			FEATURE_ADVANCED_RDS | \
-			FEATURE_COMP_CLIP
+			FEATURE_COMP_CLIP | \
+			FEATURE_UMPX_SFN_GPS | \
+			FEATURE_PPM_WTRMRKNG
 #endif
 
 /* feature mask */
@@ -65,7 +74,7 @@
 			FEATURE_LOW_LAT_MON | FEATURE_FM | \
 			FEATURE_DECLIPPER | FEATURE_DELOSSIFIER | \
 			FEATURE_AGC34_AEQ | FEATURE_DYN_SPEEDS | \
-			FEATURE_BIMP
+			FEATURE_BIMP | STE_PROC
 
 #ifdef DUMP_BITS
 static void dump_bit32(unsigned int value) {
@@ -85,7 +94,12 @@ static void show_features(unsigned int feat) {
 		printf("\t* " b "\n");
 
 #define SHOW_FEATURE_INVERSE(a, b, c) \
-	printf(((feat & a) == a && (feat & b) == b) ? "\t* " c " disabled\n" : "\t* " c "\n");
+	if (feat & a) \
+		printf((feat & b) == b ? "\t* " c " disabled\n" : "\t* " c "\n");
+
+#define SHOW_FEATURE_ONLY(a, b, c) \
+	if (!(feat & a)) \
+		printf((feat & b) == b ? "\t* " c " only\n" : "\t* " c "\n");
 
 	printf("License: 0x%08x\n", feat);
 	if (feat) printf("\t* Dehummer\n");
@@ -96,7 +110,7 @@ static void show_features(unsigned int feat) {
 	SHOW_FEATURE(FEATURE_LOW_LAT_MON,	"Low Latency Monitoring");
 	SHOW_FEATURE(FEATURE_DECLIPPER,		"Declipper & Natural Dynamics");
 	SHOW_FEATURE(FEATURE_DECLIPPER_2H,	"Declipper (2 hour limit)");
-	SHOW_FEATURE(FEATURE_NAT_DYN_ONLY,	"Natural Dynamics");
+	SHOW_FEATURE_ONLY(FEATURE_DECLIPPER, FEATURE_NAT_DYN_ONLY,	"Natural Dynamics");
 	SHOW_FEATURE(FEATURE_EVENT_FM_PROC,	"Event FM (3 days)");
 	SHOW_FEATURE(FEATURE_COMP_CLIP,		"Composite Clipper");
 	SHOW_FEATURE(FEATURE_COMP_CLIP_EVENT,	"Composite Clipper (Event FM)");
@@ -105,7 +119,10 @@ static void show_features(unsigned int feat) {
 	SHOW_FEATURE(FEATURE_AGC34_AEQ,		"3/4 AGC & Auto EQ");
 	SHOW_FEATURE(FEATURE_DYN_SPEEDS,	"Dynamic Speeds");
 	SHOW_FEATURE(FEATURE_BIMP,		"BIMP");
+	SHOW_FEATURE(FEATURE_UMPX_SFN_GPS,	"uMPX SFN GPS");
 	SHOW_FEATURE_INVERSE(FEATURE_FM_PROC,	FEATURE_UMPXP,	"uMPX+");
+	SHOW_FEATURE(FEATURE_PPM_WTRMRKNG,	"Nielsen PPM watermarking");
+	SHOW_FEATURE(STE_PROC,			"ST-Enterprise");
 }
 
 static void scramble(char *key, size_t length) {
