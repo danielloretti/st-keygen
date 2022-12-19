@@ -32,28 +32,28 @@
 
 /* known features */
 #define FEATURE_FM_PROC		(0x00000001 | 0x00000004 | 0x00000008)
-#define FEATURE_ADV_CLIPPER	0x00000002 /* also enables dehummer */
+#define FEATURE_ADV_CLIPPER	0x00000002
 #define FEATURE_ADVANCED_RDS	0x00000010
-#define FEATURE_DEHUMMER_ONLY	0x00000020
 #define FEATURE_FILE_POLLING	0x00000040
 #define FEATURE_LOW_LAT_MON	0x00000080
-#define FEATURE_DECLIPPER	0x00000800
-#define FEATURE_DECLIPPER_2H	0x00001000
-#define FEATURE_NAT_DYNAMICS	0x00004000 /* not set when declipper is enabled */
+#define FEATURE_DECLIPPER	0x00000800 /* also enables nat dynamics */
+#define FEATURE_DECLIPPER_2H	0x00001000 /* also enables nat dynamics */
+#define FEATURE_NAT_DYN_ONLY	0x00004000 /* natural dynamics only */
 #define FEATURE_EVENT_FM_PROC	0x00008000
 #define FEATURE_COMP_CLIP	0x00010000
-#define FEATURE_EVENT_COMP_CLIP	(0x00010000 | 0x00020000)
+#define FEATURE_COMP_CLIP_EVENT	0x00020000
 #define FEATURE_DELOSSIFIER	0x00040000
-#define FEATURE_UMPX_DISABLE	0x00080000
+#define FEATURE_UMPX		0x00080000 /* disabled when FM and this are set */
 #define FEATURE_AGC34_AEQ	0x00200000
 #define FEATURE_DYN_SPEEDS	0x00400000
 #define FEATURE_BIMP		0x00800000
-#define FEATURE_UMPXP_DISABLE	0x10000000
+#define FEATURE_UMPXP		0x10000000 /* disabled when FM and this are set */
 
 #ifdef EVENT_FM
 #define FEATURE_FM	FEATURE_EVENT_FM_PROC | \
 			FEATURE_ADVANCED_RDS | \
-			FEATURE_EVENT_COMP_CLIP
+			FEATURE_COMP_CLIP | \
+			FEATURE_COMP_CLIP_EVENT
 #else
 #define FEATURE_FM	FEATURE_FM_PROC | \
 			FEATURE_ADVANCED_RDS | \
@@ -79,11 +79,40 @@ static void dump_bit32(unsigned int value) {
 }
 #endif
 
-static void scrambler(char *key, size_t length) {
+static void show_features(unsigned int feat) {
+#define SHOW_FEATURE(a, b) \
+	if ((feat & a) == a) \
+		printf("\t* " b "\n");
+
+#define SHOW_FEATURE_INVERSE(a, b, c) \
+	printf(((feat & a) == a && (feat & b) == b) ? "\t* " c " disabled\n" : "\t* " c "\n");
+
+	printf("License: 0x%08x\n", feat);
+	if (feat) printf("\t* Dehummer\n");
+	SHOW_FEATURE(FEATURE_FM_PROC,		"FM Processing");
+	SHOW_FEATURE(FEATURE_ADV_CLIPPER,	"Advanced Clipper");
+	SHOW_FEATURE(FEATURE_ADVANCED_RDS,	"Advanced RDS");
+	SHOW_FEATURE(FEATURE_FILE_POLLING,	"File Polling");
+	SHOW_FEATURE(FEATURE_LOW_LAT_MON,	"Low Latency Monitoring");
+	SHOW_FEATURE(FEATURE_DECLIPPER,		"Declipper & Natural Dynamics");
+	SHOW_FEATURE(FEATURE_DECLIPPER_2H,	"Declipper (2 hour limit)");
+	SHOW_FEATURE(FEATURE_NAT_DYN_ONLY,	"Natural Dynamics");
+	SHOW_FEATURE(FEATURE_EVENT_FM_PROC,	"Event FM (3 days)");
+	SHOW_FEATURE(FEATURE_COMP_CLIP,		"Composite Clipper");
+	SHOW_FEATURE(FEATURE_COMP_CLIP_EVENT,	"Composite Clipper (Event FM)");
+	SHOW_FEATURE(FEATURE_DELOSSIFIER,	"Delossifier");
+	SHOW_FEATURE_INVERSE(FEATURE_FM_PROC,	FEATURE_UMPX,	"uMPX");
+	SHOW_FEATURE(FEATURE_AGC34_AEQ,		"3/4 AGC & Auto EQ");
+	SHOW_FEATURE(FEATURE_DYN_SPEEDS,	"Dynamic Speeds");
+	SHOW_FEATURE(FEATURE_BIMP,		"BIMP");
+	SHOW_FEATURE_INVERSE(FEATURE_FM_PROC,	FEATURE_UMPXP,	"uMPX+");
+}
+
+static void scramble(char *key, size_t length) {
 	char in, out;
 
 	for (size_t i = 0; i < length; i++) {
-		in = key[i] ^ ((-1 - i) - (1 << (1 << (i & 31) & 7)));
+		in = key[i] ^ (-1 - i - (1 << (1 << (i & 31) & 7)));
 		out = 0;
 		for (int j = 0; j < 8; j++) {
 			out <<= 1;
@@ -236,7 +265,7 @@ done_parsing_opts:
 	memcpy(key_checksum, &checksum, sizeof(int));
 
 	/* scramble the key */
-	scrambler(key, key_len);
+	scramble(key, key_len);
 
 	for (int i = 0; i < key_len; i++)
 		sprintf(out_key_text+i*2, "%02x", key[i]);
@@ -259,6 +288,8 @@ done_parsing_opts:
 		key_trailer_plain[7]
 	);
 	printf("==========================================\n");
+	printf("\n");
+	show_features(features);
 	printf("\n");
 	printf("<%s>\n", out_key_text);
 	printf("\n");
