@@ -125,8 +125,8 @@ static void show_features(unsigned int feat) {
 	SHOW_FEATURE(STE_PROC,			"ST-Enterprise");
 }
 
-static void scramble(char *key, size_t length) {
-	char in, out;
+static void scramble(unsigned char *key, size_t length) {
+	unsigned char in, out;
 
 	for (size_t i = 0; i < length; i++) {
 		in = key[i] ^ (-1 - i - (1 << (1 << (i & 31) & 7)));
