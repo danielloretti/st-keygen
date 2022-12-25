@@ -150,7 +150,7 @@ int main(int argc, char *argv[]) {
 	char name[MAXLEN+1];
 	unsigned char key[9+MAXLEN+1+8];
 	char out_key_text[(9+MAXLEN+1+8)*2];
-	char key_trailer_plain[8];
+	unsigned char key_trailer_plain[8];
 
 	unsigned char *key_features;
 	unsigned char *key_checksum;
