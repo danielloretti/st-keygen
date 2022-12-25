@@ -115,8 +115,8 @@ static char ascii2nibble(char ascii) {
 	return nibble;
 }
 
-static void descramble(char *key, size_t length) {
-	char in, out;
+static void descramble(unsigned char *key, size_t length) {
+	unsigned char in, out;
 
 	for (size_t i = 0; i < length; i++) {
 		in = key[i];
@@ -132,12 +132,12 @@ static void descramble(char *key, size_t length) {
 
 int main(int argc, char *argv[]) {
 	int opt;
-	char key[9+MAXLEN+1+8];
+	unsigned char key[9+MAXLEN+1+8];
 	char *key_ascii;
 	int features;
 	int key_checksum, checksum;
-	char *key_name;
-	char *key_trailer;
+	unsigned char *key_name;
+	unsigned char *key_trailer;
 	int key_len;
 	int name_len;
 	int i, j;
@@ -182,13 +182,10 @@ done_parsing_opts:
 	if (optind < argc)
 		key_ascii = argv[optind];
 
-	if (key_ascii[0] == '<')
-		key_ascii++;
-
 	/* convert key ASCII to bytes */
 	i = j = 0;
-	while (key_ascii[i] != 0 && i < (9+MAXLEN+1+8)*2) {
-		if (key_ascii[i] == '>') break;
+	while (key_ascii[i] != 0 && i < ((9+MAXLEN+1+8)*2) + 2) {
+		if (key_ascii[0] == '<' || key_ascii[i] == '>') continue;
 
 		if (i % 2) {
 			key[j] <<= 4;
@@ -210,17 +207,17 @@ done_parsing_opts:
 	descramble(key, key_len);
 
 	/* get the key feature bitmask */
-	memcpy(&features, key + 1, 4);
+	memcpy(&features, key + 1, sizeof(int));
 
 #ifdef DUMP_BITS
 	dump_bit32(features);
 #endif
 
 	/* get checksum */
-	memcpy(&key_checksum, key + 5, 4);
+	memcpy(&key_checksum, key + 5, sizeof(int));
 
 	/* clear checksum field */
-	memset(key + 5, 0, 4);
+	memset(key + 5, 0, sizeof(int));
 
 	/* calculate checksum */
 	checksum = 0;
@@ -245,15 +242,10 @@ done_parsing_opts:
 	printf("Key's checksum\t: 0x%08x\n", key_checksum);
 	printf("Trailing bytes\t: "
 		"%02x %02x %02x %02x %02x %02x %02x %02x\n",
-		key_trailer[0],
-		key_trailer[1],
-		key_trailer[2],
-		key_trailer[3],
-		key_trailer[4],
-		key_trailer[5],
-		key_trailer[6],
-		key_trailer[7]
-	);
+		key_trailer[0], key_trailer[1],
+		key_trailer[2], key_trailer[3],
+		key_trailer[4], key_trailer[5],
+		key_trailer[6], key_trailer[7]);
 	printf("==========================================\n");
 	printf("\n");
 	show_features(features);

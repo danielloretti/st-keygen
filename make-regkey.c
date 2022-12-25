@@ -110,7 +110,7 @@ static void show_features(unsigned int feat) {
 	SHOW_FEATURE(FEATURE_LOW_LAT_MON,	"Low Latency Monitoring");
 	SHOW_FEATURE(FEATURE_DECLIPPER,		"Declipper & Natural Dynamics");
 	SHOW_FEATURE(FEATURE_DECLIPPER_2H,	"Declipper (2 hour limit)");
-	SHOW_FEATURE_ONLY(FEATURE_DECLIPPER, FEATURE_NAT_DYN_ONLY,	"Natural Dynamics");
+	SHOW_FEATURE_ONLY(FEATURE_DECLIPPER,	FEATURE_NAT_DYN_ONLY,	"Natural Dynamics");
 	SHOW_FEATURE(FEATURE_EVENT_FM_PROC,	"Event FM (3 days)");
 	SHOW_FEATURE(FEATURE_COMP_CLIP,		"Composite Clipper");
 	SHOW_FEATURE(FEATURE_COMP_CLIP_EVENT,	"Composite Clipper (Event FM)");
@@ -148,14 +148,14 @@ int main(int argc, char *argv[]) {
 	/* key checksum */
 	int checksum;
 	char name[MAXLEN+1];
-	char key[9+MAXLEN+1+8];
+	unsigned char key[9+MAXLEN+1+8];
 	char out_key_text[(9+MAXLEN+1+8)*2];
 	char key_trailer_plain[8];
 
-	char *key_features;
-	char *key_checksum;
-	char *key_name;
-	char *key_trailer;
+	unsigned char *key_features;
+	unsigned char *key_checksum;
+	unsigned char *key_name;
+	unsigned char *key_trailer;
 
 	const char *short_opt = "f:h";
 	const struct option long_opt[] = {
@@ -210,10 +210,11 @@ done_parsing_opts:
 
 	/* input validation */
 
-	/* needed for name validation */
+	/* pad the name with spaces if it is shorter than 5 chars */
 	if (name_len < 5) {
-		printf("Name must be at least 5 characters long.\n");
-		return 1;
+		for (int i = 0; i < 5 - name_len; i++)
+			name[name_len + i] = ' ';
+		name_len = 5;
 	}
 
 	/* make sure we don't try to divide by 0 */
