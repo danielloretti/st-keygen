@@ -22,8 +22,6 @@
 #include <getopt.h>
 #include <stdlib.h>
 
-/*#define DUMP_BITS*/
-
 /* max name length */
 #define MAXLEN		108
 
@@ -51,18 +49,6 @@
 /* ST-Enterprise */
 #define STE_PROC		0x08000000
 
-#ifdef DUMP_BITS
-static void dump_bit32(unsigned int value) {
-	for (int i = 0; i < 8; i++) {
-		printf(" %d | %d %d %d %d\n", 7 - i,
-			value >> (31 - (i * 4 + 0)) & 1,
-			value >> (31 - (i * 4 + 1)) & 1,
-			value >> (31 - (i * 4 + 2)) & 1,
-			value >> (31 - (i * 4 + 3)) & 1);
-	}
-}
-#endif
-
 static void show_features(unsigned int feat) {
 #define SHOW_FEATURE(a, b) \
 	if ((feat & a) == a) \
@@ -85,7 +71,7 @@ static void show_features(unsigned int feat) {
 	SHOW_FEATURE(FEATURE_LOW_LAT_MON,	"Low Latency Monitoring");
 	SHOW_FEATURE(FEATURE_DECLIPPER,		"Declipper & Natural Dynamics");
 	SHOW_FEATURE(FEATURE_DECLIPPER_2H,	"Declipper (2 hour limit)");
-	SHOW_FEATURE_ONLY(FEATURE_DECLIPPER, FEATURE_NAT_DYN_ONLY,	"Natural Dynamics");
+	SHOW_FEATURE_ONLY(FEATURE_DECLIPPER,	FEATURE_NAT_DYN_ONLY,	"Natural Dynamics");
 	SHOW_FEATURE(FEATURE_EVENT_FM_PROC,	"Event FM (3 days)");
 	SHOW_FEATURE(FEATURE_COMP_CLIP,		"Composite Clipper");
 	SHOW_FEATURE(FEATURE_COMP_CLIP_EVENT,	"Composite Clipper (Event FM)");
@@ -103,14 +89,12 @@ static void show_features(unsigned int feat) {
 static char ascii2nibble(char ascii) {
 	char nibble = ascii;
 
-	if (ascii >= '0' && ascii <= '9') {
+	if (ascii >= '0' && ascii <= '9')
 		nibble -= '0';
-	} else if (ascii >= 'a' && ascii <= 'f') {
-		nibble -= 'a';
-		nibble += 0xa;
-	} else {
+	else if (ascii >= 'a' && ascii <= 'f')
+		nibble -= 'a' - 0xa;
+	else
 		nibble = 0;
-	}
 
 	return nibble;
 }
@@ -128,6 +112,16 @@ static void descramble(unsigned char *key, size_t length) {
 		}
 		key[i] = out ^ (-1 - i - (1 << (1 << (i & 31) & 7)));
 	}
+}
+
+static int calc_checksum(unsigned char *key, size_t length) {
+	int checksum = 0;
+
+	for (unsigned int i = 0; i < length; i++) {
+		checksum = key[i] * 0x11121 + (checksum << 3);
+		checksum += checksum >> 26;
+	}
+	return checksum;
 }
 
 int main(int argc, char *argv[]) {
@@ -155,18 +149,8 @@ keep_parsing_opts:
 
 	switch (opt) {
 		case 'h':
-		case '?':
 		default:
-			fprintf(stderr,
-				"Stereo Tool key checker\n"
-				"\n"
-				"Checks whether a given license key is valid\n"
-				"\n"
-				"Usage: %s KEY\n"
-				"\n"
-				"The \"<\" and \">\" characters are optional\n"
-				"\n",
-			argv[0]);
+			fprintf(stderr, "Usage: %s '<key>'\n", argv[0]);
 			return 1;
 	}
 
@@ -185,14 +169,14 @@ done_parsing_opts:
 	/* convert key ASCII to bytes */
 	i = j = 0;
 	while (key_ascii[i] != 0 && i < ((9+MAXLEN+1+8)*2) + 2) {
-		if (key_ascii[0] == '<' || key_ascii[i] == '>') continue;
+		if (key_ascii[i] == '<') key_ascii++;
+		if (key_ascii[i] == '>') break;
 
 		if (i % 2) {
+			key[j] = ascii2nibble(key_ascii[i-1]);
 			key[j] <<= 4;
 			key[j] |= ascii2nibble(key_ascii[i]);
 			j++;
-		} else {
-			key[j] = ascii2nibble(key_ascii[i]);
 		}
 		i++;
 	}
@@ -209,10 +193,6 @@ done_parsing_opts:
 	/* get the key feature bitmask */
 	memcpy(&features, key + 1, sizeof(int));
 
-#ifdef DUMP_BITS
-	dump_bit32(features);
-#endif
-
 	/* get checksum */
 	memcpy(&key_checksum, key + 5, sizeof(int));
 
@@ -220,11 +200,7 @@ done_parsing_opts:
 	memset(key + 5, 0, sizeof(int));
 
 	/* calculate checksum */
-	checksum = 0;
-	for (i = 0; i < key_len; i++) {
-		checksum = key[i] * 0x11121 + (checksum << 3);
-		checksum += checksum >> 26;
-	}
+	checksum = calc_checksum(key, key_len);
 
 	/* determine key name's length */
 	i = 0;

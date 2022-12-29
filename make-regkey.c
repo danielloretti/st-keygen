@@ -22,8 +22,6 @@
 #include <getopt.h>
 #include <stdlib.h>
 
-/*#define DUMP_BITS*/
-
 /* max name length */
 #define MAXLEN		108
 
@@ -75,18 +73,6 @@
 			FEATURE_DECLIPPER | FEATURE_DELOSSIFIER | \
 			FEATURE_AGC34_AEQ | FEATURE_DYN_SPEEDS | \
 			FEATURE_BIMP | STE_PROC
-
-#ifdef DUMP_BITS
-static void dump_bit32(unsigned int value) {
-	for (int i = 0; i < 8; i++) {
-		printf(" %d | %d %d %d %d\n", 7 - i,
-			value >> (31 - (i * 4 + 0)) & 1,
-			value >> (31 - (i * 4 + 1)) & 1,
-			value >> (31 - (i * 4 + 2)) & 1,
-			value >> (31 - (i * 4 + 3)) & 1);
-	}
-}
-#endif
 
 static void show_features(unsigned int feat) {
 #define SHOW_FEATURE(a, b) \
@@ -140,6 +126,34 @@ static void scramble(unsigned char *key, size_t length) {
 	}
 }
 
+static void calc_name_check(unsigned char *trailer, char *name) {
+	/* the algorithm as found on ghidra */
+	trailer[0] = (((name[0] | name[1]) ^ ((name[2] | name[3]) + name[4])) & 0xf) << 4;
+	trailer[0] |= (name[0] ^ name[1] ^ name[2] ^ name[3] ^ name[4]) & 0xf;
+	trailer[1] = (((name[0] * name[1]) / ((name[2] - name[3]) + 1) - name[4]) & 0xf) << 4;
+	trailer[1] |= ((name[0] * name[1]) / ((name[2] - name[3]) + 1) * name[4]) & 0xf;
+	trailer[2] = (((name[2] + name[3]) * (name[0] - name[1]) ^ ~name[4]) & 0xf) << 4;
+	trailer[2] |= ((name[2] - name[3]) * (name[0] + name[1]) ^ name[4]) & 0xf;
+	trailer[3] = ((((name[0] ^ name[1]) + (name[2] ^ name[3])) ^ name[4]) & 0xf) << 4;
+	trailer[3] |= (name[0] + name[1] + name[2] - name[3] - name[4]) & 0xf;
+
+	/* reserved */
+	trailer[4] = 0;
+	trailer[5] = 0;
+	trailer[6] = 0;
+	trailer[7] = 0;
+}
+
+static int calc_checksum(unsigned char *key, size_t length) {
+	int checksum = 0;
+
+	for (unsigned int i = 0; i < length; i++) {
+		checksum = key[i] * 0x11121 + (checksum << 3);
+		checksum += checksum >> 26;
+	}
+	return checksum;
+}
+
 int main(int argc, char *argv[]) {
 	int opt;
 	unsigned int features = FEATURES;
@@ -150,17 +164,15 @@ int main(int argc, char *argv[]) {
 	char name[MAXLEN+1];
 	unsigned char key[9+MAXLEN+1+8];
 	char out_key_text[(9+MAXLEN+1+8)*2];
-	unsigned char key_trailer_plain[8];
 
 	unsigned char *key_features;
 	unsigned char *key_checksum;
 	unsigned char *key_name;
 	unsigned char *key_trailer;
 
-	const char *short_opt = "f:h";
+	const char *short_opt = "f:";
 	const struct option long_opt[] = {
 		{"features",	required_argument,	NULL,	'f'},
-		{"help",	no_argument,		NULL,	'h'},
 		{0,		0,			0,	0}
 	};
 
@@ -174,8 +186,6 @@ keep_parsing_opts:
 			features = strtoul(optarg, NULL, 16);
 			break;
 
-		case 'h':
-		case '?':
 		default:
 			fprintf(stderr,
 				"Stereo Tool key generator\n"
@@ -214,6 +224,7 @@ done_parsing_opts:
 	if (name_len < 5) {
 		for (int i = 0; i < 5 - name_len; i++)
 			name[name_len + i] = ' ';
+		name[5] = 0;
 		name_len = 5;
 	}
 
@@ -223,10 +234,6 @@ done_parsing_opts:
 		printf("Invalid name.\n");
 		return 1;
 	}
-
-#ifdef DUMP_BITS
-	dump_bit32(features);
-#endif
 
 	/*
 	 * 18 = the stuff before and after the key (112233445566778899<name>00aabbccddeeffaabb)
@@ -251,33 +258,14 @@ done_parsing_opts:
 	/* add terminator */
 	(key_name + name_len)[0] = 0;
 
-	/* the algorithm as found on ghidra */
-	key_trailer_plain[0] = (((name[0] | name[1]) ^ ((name[2] | name[3]) + name[4])) & 0xf) << 4;
-	key_trailer_plain[0] |= (name[0] ^ name[1] ^ name[2] ^ name[3] ^ name[4]) & 0xf;
-	key_trailer_plain[1] = (((name[0] * name[1]) / ((name[2] - name[3]) + 1) - name[4]) & 0xf) << 4;
-	key_trailer_plain[1] |= ((name[0] * name[1]) / ((name[2] - name[3]) + 1) * name[4]) & 0xf;
-	key_trailer_plain[2] = (((name[2] + name[3]) * (name[0] - name[1]) ^ ~name[4]) & 0xf) << 4;
-	key_trailer_plain[2] |= ((name[2] - name[3]) * (name[0] + name[1]) ^ name[4]) & 0xf;
-	key_trailer_plain[3] = ((((name[0] ^ name[1]) + (name[2] ^ name[3])) ^ name[4]) & 0xf) << 4;
-	key_trailer_plain[3] |= (name[0] + name[1] + name[2] - name[3] - name[4]) & 0xf;
-	/* these are not determined yet */
-	key_trailer_plain[4] = 0;
-	key_trailer_plain[5] = 0;
-	key_trailer_plain[6] = 0;
-	key_trailer_plain[7] = 0;
-
-	/* copy the key trailer before scrambling */
-	memcpy(key_trailer, key_trailer_plain, 8);
+	/* add name check trailer */
+	calc_name_check(key_trailer, name);
 
 	/* clear checksum field */
 	memset(key_checksum, 0, sizeof(int));
 
 	/* calculate the checksum */
-	checksum = 0;
-	for (int i = 0; i < key_len; i++) {
-		checksum = key[i] * 0x11121 + (checksum << 3);
-		checksum += checksum >> 26;
-	}
+	checksum = calc_checksum(key, key_len);
 
 	/* copy the checksum */
 	memcpy(key_checksum, &checksum, sizeof(int));
@@ -294,17 +282,6 @@ done_parsing_opts:
 	printf("Name\t\t: %s\n", name);
 	printf("Features\t: 0x%08x\n", features);
 	printf("Calc'd checksum\t: 0x%08x\n", checksum);
-	printf("Trailing bytes\t: "
-		"%02x %02x %02x %02x %02x %02x %02x %02x\n",
-		key_trailer_plain[0],
-		key_trailer_plain[1],
-		key_trailer_plain[2],
-		key_trailer_plain[3],
-		key_trailer_plain[4],
-		key_trailer_plain[5],
-		key_trailer_plain[6],
-		key_trailer_plain[7]
-	);
 	printf("==========================================\n");
 	printf("\n");
 	show_features(features);
