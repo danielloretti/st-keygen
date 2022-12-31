@@ -187,16 +187,8 @@ keep_parsing_opts:
 			break;
 
 		default:
-			fprintf(stderr,
-				"Stereo Tool key generator\n"
-				"\n"
-				"Generates a valid registration key for a given name\n"
-				"\n"
-				"Usage: %s [ -f features (hex) ] NAME\n"
-				"\n"
-				"\t-f features\tRegistered options in hexadecimal (optional)\n"
-				"\n",
-			argv[0]);
+			printf("Usage: %s [ -f features (hex) ] NAME\n",
+				argv[0]);
 			return 1;
 	}
 
@@ -214,7 +206,7 @@ done_parsing_opts:
 	}
 
 	if (!name[0]) {
-		printf("Please specify a name.\n");
+		printf("Please enter a name.\n");
 		return 1;
 	}
 

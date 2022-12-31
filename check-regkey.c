@@ -19,7 +19,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <getopt.h>
 #include <stdlib.h>
 
 /* max name length */
@@ -125,7 +124,6 @@ static int calc_checksum(unsigned char *key, size_t length) {
 }
 
 int main(int argc, char *argv[]) {
-	int opt;
 	unsigned char key[9+MAXLEN+1+8];
 	char *key_ascii;
 	int features;
@@ -136,35 +134,12 @@ int main(int argc, char *argv[]) {
 	int name_len;
 	int i, j;
 
-	const char *short_opt = "h";
-	const struct option long_opt[] = {
-		{"help",	no_argument,	NULL,	'h'},
-		{0,		0,		0,	0}
-	};
-
-keep_parsing_opts:
-
-	opt = getopt_long(argc, argv, short_opt, long_opt, NULL);
-	if (opt == -1) goto done_parsing_opts;
-
-	switch (opt) {
-		case 'h':
-		default:
-			fprintf(stderr, "Usage: %s '<key>'\n", argv[0]);
-			return 1;
-	}
-
-	goto keep_parsing_opts;
-
-done_parsing_opts:
-
 	if (argc < 2) {
-		printf("Please specify a key.\n");
+		printf("Usage: %s '<key>'\n", argv[0]);
 		return 1;
 	}
 
-	if (optind < argc)
-		key_ascii = argv[optind];
+	key_ascii = argv[1];
 
 	/* convert key ASCII to bytes */
 	i = j = 0;
