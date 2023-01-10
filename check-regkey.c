@@ -192,7 +192,8 @@ int main(int argc, char *argv[]) {
 	printf("Calc'd checksum\t: 0x%08x\n", checksum);
 	printf("Key's checksum\t: 0x%08x\n", key_checksum);
 	printf("Trailing bytes\t: "
-		"%02x %02x %02x %02x %02x %02x %02x %02x\n",
+		"0x%02x 0x%02x 0x%02x 0x%02x\n"
+		"\t\t  0x%02x 0x%02x 0x%02x 0x%02x\n",
 		key_trailer[0], key_trailer[1],
 		key_trailer[2], key_trailer[3],
 		key_trailer[4], key_trailer[5],

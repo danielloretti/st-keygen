@@ -25,8 +25,8 @@
 /* max name length */
 #define MAXLEN		108
 
-/* uncomment for event FM license (3 days) */
-/*#define EVENT_FM*/
+/* set to 1 for event FM license (3 days) */
+#define EVENT_FM	0
 
 /* known features */
 #define FEATURE_FM_PROC		(0x00000001 | 0x00000004 | 0x00000008)
@@ -52,7 +52,7 @@
 /* ST-Enterprise */
 #define STE_PROC		0x08000000
 
-#ifdef EVENT_FM
+#if EVENT_FM
 #define FEATURE_FM	FEATURE_EVENT_FM_PROC | \
 			FEATURE_ADVANCED_RDS | \
 			FEATURE_COMP_CLIP | \
@@ -87,28 +87,32 @@ static void show_features(unsigned int feat) {
 	if (!(feat & a)) \
 		printf((feat & b) == b ? "\t* " c " only\n" : "\t* " c "\n");
 
+#define SHOW_FEATURE_ALWAYS(a) \
+	if (feat) \
+		printf("\t* " a "\n");
+
 	printf("License: 0x%08x\n", feat);
-	if (feat) printf("\t* Dehummer\n");
-	SHOW_FEATURE(FEATURE_FM_PROC,		"FM Processing");
-	SHOW_FEATURE(FEATURE_ADV_CLIPPER,	"Advanced Clipper");
-	SHOW_FEATURE(FEATURE_ADVANCED_RDS,	"Advanced RDS");
-	SHOW_FEATURE(FEATURE_FILE_POLLING,	"File Polling");
-	SHOW_FEATURE(FEATURE_LOW_LAT_MON,	"Low Latency Monitoring");
-	SHOW_FEATURE(FEATURE_DECLIPPER,		"Declipper & Natural Dynamics");
-	SHOW_FEATURE(FEATURE_DECLIPPER_2H,	"Declipper (2 hour limit)");
+	SHOW_FEATURE_ALWAYS(						"Dehummer");
+	SHOW_FEATURE(FEATURE_FM_PROC,					"FM Processing");
+	SHOW_FEATURE(FEATURE_ADV_CLIPPER,				"Advanced Clipper");
+	SHOW_FEATURE(FEATURE_ADVANCED_RDS,				"Advanced RDS");
+	SHOW_FEATURE(FEATURE_FILE_POLLING,				"File Polling");
+	SHOW_FEATURE(FEATURE_LOW_LAT_MON,				"Low Latency Monitoring");
+	SHOW_FEATURE(FEATURE_DECLIPPER,					"Declipper & Natural Dynamics");
+	SHOW_FEATURE(FEATURE_DECLIPPER_2H,				"Declipper (2 hour limit)");
 	SHOW_FEATURE_ONLY(FEATURE_DECLIPPER,	FEATURE_NAT_DYN_ONLY,	"Natural Dynamics");
-	SHOW_FEATURE(FEATURE_EVENT_FM_PROC,	"Event FM (3 days)");
-	SHOW_FEATURE(FEATURE_COMP_CLIP,		"Composite Clipper");
-	SHOW_FEATURE(FEATURE_COMP_CLIP_EVENT,	"Composite Clipper (Event FM)");
-	SHOW_FEATURE(FEATURE_DELOSSIFIER,	"Delossifier");
-	SHOW_FEATURE_INVERSE(FEATURE_FM_PROC,	FEATURE_UMPX,	"uMPX");
-	SHOW_FEATURE(FEATURE_AGC34_AEQ,		"3/4 AGC & Auto EQ");
-	SHOW_FEATURE(FEATURE_DYN_SPEEDS,	"Dynamic Speeds");
-	SHOW_FEATURE(FEATURE_BIMP,		"BIMP");
-	SHOW_FEATURE(FEATURE_UMPX_SFN_GPS,	"uMPX SFN GPS");
-	SHOW_FEATURE_INVERSE(FEATURE_FM_PROC,	FEATURE_UMPXP,	"uMPX+");
-	SHOW_FEATURE(FEATURE_PPM_WTRMRKNG,	"Nielsen PPM watermarking");
-	SHOW_FEATURE(STE_PROC,			"ST-Enterprise");
+	SHOW_FEATURE(FEATURE_EVENT_FM_PROC,				"Event FM (3 days)");
+	SHOW_FEATURE(FEATURE_COMP_CLIP,					"Composite Clipper");
+	SHOW_FEATURE(FEATURE_COMP_CLIP_EVENT,				"Composite Clipper (Event FM)");
+	SHOW_FEATURE(FEATURE_DELOSSIFIER,				"Delossifier");
+	SHOW_FEATURE_INVERSE(FEATURE_FM_PROC,	FEATURE_UMPX,		"uMPX");
+	SHOW_FEATURE(FEATURE_AGC34_AEQ,					"3/4 AGC & Auto EQ");
+	SHOW_FEATURE(FEATURE_DYN_SPEEDS,				"Dynamic Speeds");
+	SHOW_FEATURE(FEATURE_BIMP,					"BIMP");
+	SHOW_FEATURE(FEATURE_UMPX_SFN_GPS,				"uMPX SFN GPS");
+	SHOW_FEATURE_INVERSE(FEATURE_FM_PROC,	FEATURE_UMPXP,		"uMPX+");
+	SHOW_FEATURE(FEATURE_PPM_WTRMRKNG,				"Nielsen PPM watermarking");
+	SHOW_FEATURE(STE_PROC,						"ST-Enterprise");
 }
 
 static void scramble(unsigned char *key, size_t length) {
@@ -165,11 +169,6 @@ int main(int argc, char *argv[]) {
 	unsigned char key[9+MAXLEN+1+8];
 	char out_key_text[(9+MAXLEN+1+8)*2];
 
-	unsigned char *key_features;
-	unsigned char *key_checksum;
-	unsigned char *key_name;
-	unsigned char *key_trailer;
-
 	const char *short_opt = "f:";
 	const struct option long_opt[] = {
 		{"features",	required_argument,	NULL,	'f'},
@@ -202,7 +201,8 @@ done_parsing_opts:
 			printf("Name is too long.\n");
 			return 1;
 		}
-		strncat(name, argv[optind], MAXLEN);
+		name[MAXLEN] = 0;
+		strncpy(name, argv[optind], MAXLEN);
 	}
 
 	if (!name[0]) {
@@ -233,34 +233,28 @@ done_parsing_opts:
 	 */
 	key_len = 9 + name_len + 1 /* null terminator for name string */ + 8;
 
-	/* the locations of the important parts */
-	key_features	= key + 1; /* licensed features */
-	key_checksum	= key + 5;
-	key_name	= key + 9; /* display name */
-	key_trailer	= key_name + name_len + 1; /* name validation */
-
-	key[0] = 1; /* doesn't seem to affect anything */
+	*key = 1; /* doesn't seem to affect anything */
 
 	/* registered options */
-	memcpy(key_features, &features, sizeof(int));
+	memcpy(key+1, &features, 4);
 
 	/* copy name to key */
-	memcpy(key_name, name, name_len);
+	memcpy(key+9, name, name_len);
 
 	/* add terminator */
-	(key_name + name_len)[0] = 0;
+	*(key+9+name_len) = 0;
 
 	/* add name check trailer */
-	calc_name_check(key_trailer, name);
+	calc_name_check(key+9+name_len + 1, name);
 
 	/* clear checksum field */
-	memset(key_checksum, 0, sizeof(int));
+	memset(key+5, 0, 4);
 
 	/* calculate the checksum */
 	checksum = calc_checksum(key, key_len);
 
 	/* copy the checksum */
-	memcpy(key_checksum, &checksum, sizeof(int));
+	memcpy(key+5, &checksum, 4);
 
 	/* scramble the key */
 	scramble(key, key_len);
