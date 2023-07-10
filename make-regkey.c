@@ -165,15 +165,17 @@ int main(int argc, char *argv[]) {
 	int key_len;
 	/* key checksum */
 	int checksum;
-	char name[MAXLEN+1];
-	unsigned char key[9+MAXLEN+1+8];
-	char out_key_text[(9+MAXLEN+1+8)*2];
+	char name[MAXLEN + 1];
+	unsigned char key[9 + MAXLEN + 1 + 8];
+	char out_key_text[(9 + MAXLEN + 1 + 8) * 2];
 
 	const char *short_opt = "f:";
 	const struct option long_opt[] = {
 		{"features",	required_argument,	NULL,	'f'},
 		{0,		0,			0,	0}
 	};
+
+	memset(name, 0, MAXLEN + 1);
 
 keep_parsing_opts:
 
@@ -236,31 +238,31 @@ done_parsing_opts:
 	*key = 1; /* doesn't seem to affect anything */
 
 	/* registered options */
-	memcpy(key+1, &features, 4);
+	memcpy(key + 1, &features, 4);
 
 	/* copy name to key */
-	memcpy(key+9, name, name_len);
+	memcpy(key + 9, name, name_len);
 
 	/* add terminator */
-	*(key+9+name_len) = 0;
+	*(key + 9 + name_len) = 0;
 
 	/* add name check trailer */
-	calc_name_check(key+9+name_len + 1, name);
+	calc_name_check(key + 9 + name_len + 1, name);
 
 	/* clear checksum field */
-	memset(key+5, 0, 4);
+	memset(key + 5, 0, 4);
 
 	/* calculate the checksum */
 	checksum = calc_checksum(key, key_len);
 
 	/* copy the checksum */
-	memcpy(key+5, &checksum, 4);
+	memcpy(key + 5, &checksum, 4);
 
 	/* scramble the key */
 	scramble(key, key_len);
 
 	for (int i = 0; i < key_len; i++)
-		sprintf(out_key_text+i*2, "%02x", key[i]);
+		sprintf(out_key_text + i * 2, "%02x", key[i]);
 
 	/* output */
 	printf("\n");

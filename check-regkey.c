@@ -143,12 +143,12 @@ int main(int argc, char *argv[]) {
 
 	/* convert key ASCII to bytes */
 	i = j = 0;
-	while (key_ascii[i] != 0 && i < ((9+MAXLEN+1+8)*2) + 2) {
+	while (key_ascii[i] != 0 && i < ((9 + MAXLEN + 1 + 8) * 2) + 2) {
 		if (key_ascii[i] == '<') key_ascii++;
 		if (key_ascii[i] == '>') break;
 
 		if (i % 2) {
-			key[j] = ascii2nibble(key_ascii[i-1]);
+			key[j] = ascii2nibble(key_ascii[i - 1]);
 			key[j] <<= 4;
 			key[j] |= ascii2nibble(key_ascii[i]);
 			j++;
