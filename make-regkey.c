@@ -25,44 +25,66 @@
 /* max name length */
 #define MAXLEN		108
 
-/* set to 1 for event FM license (3 days) */
+/* set to 1 for event FM (4 days) license */
 #define EVENT_FM	0
 
 /* known features */
-#define FEATURE_FM_PROC		(0x00000001 | 0x00000004 | 0x00000008)
+#define FEATURE_FM_STANDARD	(0x00000001 | 0x00000008)
 #define FEATURE_ADV_CLIPPER	0x00000002
+#define UNKNOWN_1		0x00000004
 #define FEATURE_ADVANCED_RDS	0x00000010
+#define UNKNOWN_2		0x00000020
 #define FEATURE_FILE_POLLING	0x00000040
 #define FEATURE_LOW_LAT_MON	0x00000080
+#define UNKNOWN_3		0x00000100
+#define UNKNOWN_4		0x00000200
+#define UNKNOWN_5		0x00000400
 #define FEATURE_DECLIPPER	0x00000800 /* also enables nat dynamics */
 #define FEATURE_DECLIPPER_2H	0x00001000 /* also enables nat dynamics */
+#define UNKNOWN_6		0x00002000
 #define FEATURE_NAT_DYN_ONLY	0x00004000 /* natural dynamics only */
-#define FEATURE_EVENT_FM_PROC	0x00008000
-#define FEATURE_COMP_CLIP	0x00010000
-#define FEATURE_COMP_CLIP_EVENT	0x00020000
+#define FEATURE_FM_EVENT	0x00008000
+#define FEATURE_FM_PRO		0x00010000
+#define FEATURE_FM_PRO_EVENT	0x00020000
 #define FEATURE_DELOSSIFIER	0x00040000
 #define FEATURE_UMPX		0x00080000 /* disabled when FM and this are set */
+#define UNKNOWN_7		0x00100000
 #define FEATURE_AGC34_AEQ	0x00200000
-#define FEATURE_DYN_SPEEDS	0x00400000
+#define FEATURE_DYN_SPEEDS	0x00400000 /* AGC3/4 & Auto EQ needed */
 #define FEATURE_BIMP		0x00800000
 #define FEATURE_UMPX_SFN_GPS	0x01000000
+#define UNKNOWN_8		0x02000000
+#define UNKNOWN_9		0x04000000
+#define FEATURE_STE_PROC	0x08000000 /* ST-Enterprise */
 #define FEATURE_UMPXP		0x10000000 /* disabled when FM and this are set */
+#define UNKNOWN_10		0x20000000
 #define FEATURE_PPM_WTRMRKNG	0x40000000
+#define UNKNOWN_11		0x80000000
 
-/* ST-Enterprise */
-#define STE_PROC		0x08000000
+/* The following bits are not known or not assigned yet:
+ *
+ * Some have reported hearing the unregistered message after a period of time
+ * has passed. It is not known which of these extra bits are needed to
+ * supress the message. See the issues list for more information.
+ */
+#define UNUSED_BITS	( \
+			UNKNOWN_1 | UNKNOWN_2 | UNKNOWN_3 | \
+			UNKNOWN_4 | UNKNOWN_5 | UNKNOWN_6 | \
+			UNKNOWN_7 | UNKNOWN_8 | UNKNOWN_9 | \
+			UNKNOWN_10 | UNKNOWN_11 \
+			)
 
 #if EVENT_FM
-#define FEATURE_FM	FEATURE_EVENT_FM_PROC | \
+#define FEATURE_FM	FEATURE_FM_EVENT | \
 			FEATURE_ADVANCED_RDS | \
-			FEATURE_COMP_CLIP | \
-			FEATURE_COMP_CLIP_EVENT | \
+			FEATURE_FM_PRO | \
+			FEATURE_FM_PRO_EVENT | \
 			FEATURE_UMPX_SFN_GPS | \
 			FEATURE_PPM_WTRMRKNG
 #else
-#define FEATURE_FM	FEATURE_FM_PROC | \
+#define FEATURE_FM	FEATURE_FM_STANDARD | \
 			FEATURE_ADVANCED_RDS | \
-			FEATURE_COMP_CLIP | \
+			FEATURE_FM_PRO | \
 			FEATURE_UMPX_SFN_GPS | \
 			FEATURE_PPM_WTRMRKNG
 #endif
@@ -72,47 +94,75 @@
 			FEATURE_LOW_LAT_MON | FEATURE_FM | \
 			FEATURE_DECLIPPER | FEATURE_DELOSSIFIER | \
 			FEATURE_AGC34_AEQ | FEATURE_DYN_SPEEDS | \
-			FEATURE_BIMP | STE_PROC
+			FEATURE_BIMP | FEATURE_STE_PROC | UNUSED_BITS
 
 static void show_features(unsigned int feat) {
 #define SHOW_FEATURE(a, b) \
 	if ((feat & a) == a) \
-		printf("\t* " b "\n");
+		printf(" * (0x%08x) " b "\n", a);
 
-#define SHOW_FEATURE_INVERSE(a, b, c) \
-	if (feat & a) \
-		printf((feat & b) == b ? "\t* " c " disabled\n" : "\t* " c "\n");
+#define SHOW_FEATURE_MUT_EX(a, b, c) \
+	if ((feat & a) || (feat & b)) \
+		printf((feat & b) == b ? \
+			" * (0x%08x) " c " disabled\n" : \
+			" * (0x%08x) " c "\n", (feat & b) == b ? a : b);
 
 #define SHOW_FEATURE_ONLY(a, b, c) \
-	if (!(feat & a)) \
-		printf((feat & b) == b ? "\t* " c " only\n" : "\t* " c "\n");
+	if ((feat & b) && !(feat & a)) \
+		printf(" * (0x%08x) " c " only\n", a);
 
+#define SHOW_FEATURE_COND(a, b, c) \
+	if (feat & a) \
+		printf((feat & b) == b ? \
+			" * (0x%08x) " c "\n" : \
+			" * (0x%08x) " c " disabled\n", a);
+
+/* for Dehummer only */
 #define SHOW_FEATURE_ALWAYS(a) \
 	if (feat) \
-		printf("\t* " a "\n");
+		printf(" * (  always  ) " a "\n");
+
+#define SHOW_FEATURE_UNKNOWN(a) \
+	if (feat & a) \
+		printf(" * (0x%08x) Unknown\n", a);
 
 	printf("License: 0x%08x\n", feat);
-	SHOW_FEATURE_ALWAYS(						"Dehummer");
-	SHOW_FEATURE(FEATURE_FM_PROC,					"FM Processing");
-	SHOW_FEATURE(FEATURE_ADV_CLIPPER,				"Advanced Clipper");
-	SHOW_FEATURE(FEATURE_ADVANCED_RDS,				"Advanced RDS");
-	SHOW_FEATURE(FEATURE_FILE_POLLING,				"File Polling");
-	SHOW_FEATURE(FEATURE_LOW_LAT_MON,				"Low Latency Monitoring");
-	SHOW_FEATURE(FEATURE_DECLIPPER,					"Declipper & Natural Dynamics");
-	SHOW_FEATURE(FEATURE_DECLIPPER_2H,				"Declipper (2 hour limit)");
-	SHOW_FEATURE_ONLY(FEATURE_DECLIPPER,	FEATURE_NAT_DYN_ONLY,	"Natural Dynamics");
-	SHOW_FEATURE(FEATURE_EVENT_FM_PROC,				"Event FM (3 days)");
-	SHOW_FEATURE(FEATURE_COMP_CLIP,					"Composite Clipper");
-	SHOW_FEATURE(FEATURE_COMP_CLIP_EVENT,				"Composite Clipper (Event FM)");
-	SHOW_FEATURE(FEATURE_DELOSSIFIER,				"Delossifier");
-	SHOW_FEATURE_INVERSE(FEATURE_FM_PROC,	FEATURE_UMPX,		"uMPX");
-	SHOW_FEATURE(FEATURE_AGC34_AEQ,					"3/4 AGC & Auto EQ");
-	SHOW_FEATURE(FEATURE_DYN_SPEEDS,				"Dynamic Speeds");
-	SHOW_FEATURE(FEATURE_BIMP,					"BIMP");
-	SHOW_FEATURE(FEATURE_UMPX_SFN_GPS,				"uMPX SFN GPS");
-	SHOW_FEATURE_INVERSE(FEATURE_FM_PROC,	FEATURE_UMPXP,		"uMPX+");
-	SHOW_FEATURE(FEATURE_PPM_WTRMRKNG,				"Nielsen PPM watermarking");
-	SHOW_FEATURE(STE_PROC,						"ST-Enterprise");
+	SHOW_FEATURE_ALWAYS(			"Dehummer");
+	SHOW_FEATURE(FEATURE_FM_STANDARD,	"FM Processing");
+	SHOW_FEATURE(FEATURE_ADV_CLIPPER,	"Advanced Clipper");
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_1);
+	SHOW_FEATURE(FEATURE_ADVANCED_RDS,	"Advanced RDS");
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_2);
+	SHOW_FEATURE(FEATURE_FILE_POLLING,	"File Polling");
+	SHOW_FEATURE(FEATURE_LOW_LAT_MON,	"Low Latency Monitoring");
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_3);
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_4);
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_5);
+	SHOW_FEATURE(FEATURE_DECLIPPER,		"Declipper & Natural Dynamics");
+	SHOW_FEATURE(FEATURE_DECLIPPER_2H,	"Declipper (2 hours)");
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_6);
+	SHOW_FEATURE_ONLY(FEATURE_DECLIPPER,
+			FEATURE_NAT_DYN_ONLY,	"Natural Dynamics");
+	SHOW_FEATURE(FEATURE_FM_EVENT,		"Event FM Processing (3 days)");
+	SHOW_FEATURE(FEATURE_FM_PRO,		"FM Professional");
+	SHOW_FEATURE(FEATURE_FM_PRO_EVENT,	"FM Professional (Event FM)");
+	SHOW_FEATURE(FEATURE_DELOSSIFIER,	"Delossifier");
+	SHOW_FEATURE_MUT_EX(FEATURE_FM_STANDARD,
+			FEATURE_UMPX,		"uMPX");
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_7);
+	SHOW_FEATURE(FEATURE_AGC34_AEQ,		"Advanced Dynamics (3/4 AGC & Auto EQ)");
+	SHOW_FEATURE_COND(FEATURE_DYN_SPEEDS,
+			FEATURE_AGC34_AEQ,	"Advanced Dynamics (Dynamic Speeds)");
+	SHOW_FEATURE(FEATURE_BIMP,		"BIMP");
+	SHOW_FEATURE(FEATURE_UMPX_SFN_GPS,	"uMPX SFN GPS");
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_8);
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_9);
+	SHOW_FEATURE(FEATURE_STE_PROC,		"ST-Enterprise");
+	SHOW_FEATURE_MUT_EX(FEATURE_FM_STANDARD,
+			FEATURE_UMPXP,		"uMPX+");
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_10);
+	SHOW_FEATURE(FEATURE_PPM_WTRMRKNG,	"Nielsen PPM watermarking");
+	SHOW_FEATURE_UNKNOWN(UNKNOWN_11);
 }
 
 static void scramble(unsigned char *key, size_t length) {
@@ -163,23 +213,17 @@ int main(int argc, char *argv[]) {
 	unsigned int features = FEATURES;
 	int name_len;
 	int key_len;
+	unsigned char key_trailer[8];
 	/* key checksum */
 	int checksum;
 	char name[MAXLEN + 1];
 	unsigned char key[9 + MAXLEN + 1 + 8];
 	char out_key_text[(9 + MAXLEN + 1 + 8) * 2];
-
 	const char *short_opt = "f:";
-	const struct option long_opt[] = {
-		{"features",	required_argument,	NULL,	'f'},
-		{0,		0,			0,	0}
-	};
-
-	memset(name, 0, MAXLEN + 1);
 
 keep_parsing_opts:
 
-	opt = getopt_long(argc, argv, short_opt, long_opt, NULL);
+	opt = getopt(argc, argv, short_opt);
 	if (opt == -1) goto done_parsing_opts;
 
 	switch (opt) {
@@ -196,6 +240,8 @@ keep_parsing_opts:
 	goto keep_parsing_opts;
 
 done_parsing_opts:
+
+	name[0] = 0;
 
 	if (optind < argc) {
 		name_len = strlen(argv[optind]);
@@ -248,6 +294,7 @@ done_parsing_opts:
 
 	/* add name check trailer */
 	calc_name_check(key + 9 + name_len + 1, name);
+	memcpy(key_trailer, key + 9 + name_len + 1, 8);
 
 	/* clear checksum field */
 	memset(key + 5, 0, 4);
@@ -270,6 +317,13 @@ done_parsing_opts:
 	printf("Name\t\t: %s\n", name);
 	printf("Features\t: 0x%08x\n", features);
 	printf("Calc'd checksum\t: 0x%08x\n", checksum);
+	printf("Trailing bytes\t: "
+		"0x%02x 0x%02x 0x%02x 0x%02x\n"
+		"\t\t  0x%02x 0x%02x 0x%02x 0x%02x\n",
+		key_trailer[0], key_trailer[1],
+		key_trailer[2], key_trailer[3],
+		key_trailer[4], key_trailer[5],
+		key_trailer[6], key_trailer[7]);
 	printf("==========================================\n");
 	printf("\n");
 	show_features(features);
