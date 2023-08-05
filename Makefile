@@ -2,13 +2,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -pedantic
 
-all: clean make-regkey check-regkey
-
-make-regkey: make-regkey.o
-	$(CC) make-regkey.o -o make-regkey -s
-
-check-regkey: check-regkey.o
-	$(CC) check-regkey.o -o check-regkey -s
-
-clean:
-	rm -f *.o
+all:
+	$(CC) $(CFLAGS) make-regkey.c -o make-regkey -s
+	$(CC) $(CFLAGS) check-regkey.c -o check-regkey -s
