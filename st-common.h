@@ -52,11 +52,9 @@
 #define FEATURE_PPM_WTRMRKNG	0x40000000
 #define UNKNOWN_10		0x80000000
 
-/* The following bits are not known or not assigned yet:
+/*
+ * The following bits are not known or not assigned yet:
  *
- * Some have reported hearing the unregistered message after a period of time
- * has passed. It is not known which of these extra bits are needed to
- * supress the message. See the issues list for more information.
  */
 #define UNUSED_BITS	( \
 			UNKNOWN_1 | UNKNOWN_2 | UNKNOWN_3 | \
@@ -81,12 +79,11 @@
 #endif
 
 /* feature mask */
-#define FEATURES	(FEATURE_ADV_CLIPPER | FEATURE_FILE_POLLING | \
+#define FEATURES	FEATURE_ADV_CLIPPER | FEATURE_FILE_POLLING | \
 			FEATURE_LOW_LAT_MON | FEATURE_FM | \
 			FEATURE_DECLIPPER | FEATURE_DELOSSIFIER | \
 			FEATURE_ADV_DYNAMICS | FEATURE_DYN_SPEEDS | \
-			FEATURE_BIMP | FEATURE_STE_PROC) /*| \
-			(UNKNOWN_1 | UNKNOWN_2 | UNKNOWN_3)*/
+			FEATURE_BIMP | FEATURE_STE_PROC
 
 static void show_features(unsigned int feat) {
 #define SHOW_FEATURE(a, b) \
@@ -97,7 +94,7 @@ static void show_features(unsigned int feat) {
 	if ((feat & a) || (feat & b)) \
 		printf((feat & b) == b ? \
 			" * (0x%08x) " c " disabled\n" : \
-			" * (0x%08x) " c "\n", (feat & b) == b ? a : b);
+			" * (0x%08x) " c "\n", (feat & b) == 0 ? a : b);
 
 #define SHOW_FEATURE_ONLY(a, b, c) \
 	if ((feat & b) && !(feat & a)) \
@@ -175,9 +172,10 @@ static void calc_name_check(char *trailer, char *name) {
 	trailer[2] |= ((name[2] - name[3]) * (name[0] + name[1]) ^ name[4]) & 0xf;
 	trailer[3] = ((((name[0] ^ name[1]) + (name[2] ^ name[3])) ^ name[4]) & 0xf) << 4;
 	trailer[3] |= (name[0] + name[1] + name[2] - name[3] - name[4]) & 0xf;
+	trailer[4] = (((name[0] + name[1]) - (name[2] + name[3])) - name[4]) & 0xf;
+	trailer[4] |= (((name[2] & name[3]) ^ (name[0] & name[1]) ^ name[4]) & 0xf) << 4;
 
 	/* reserved */
-	trailer[4] = 0;
 	trailer[5] = 0;
 	trailer[6] = 0;
 	trailer[7] = 0;
