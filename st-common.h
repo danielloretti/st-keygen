@@ -151,7 +151,7 @@ static void show_features(unsigned int feat) {
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_10);
 }
 
-static int calc_checksum(char *key, int length) {
+static int calc_checksum(unsigned char *key, int length) {
 	int checksum = 0;
 	int i;
 
@@ -162,7 +162,7 @@ static int calc_checksum(char *key, int length) {
 	return checksum;
 }
 
-static void calc_name_check(char *trailer, char *name) {
+static void calc_name_check(unsigned char *trailer, char *name) {
 	/* the algorithm as found on ghidra */
 	trailer[0] = (((name[0] | name[1]) ^ ((name[2] | name[3]) + name[4])) & 0xf) << 4;
 	trailer[0] |= (name[0] ^ name[1] ^ name[2] ^ name[3] ^ name[4]) & 0xf;

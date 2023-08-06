@@ -27,8 +27,8 @@
 
 #include "st-common.h"
 
-static void scramble(char *key, int length) {
-	char in, out;
+static void scramble(unsigned char *key, int length) {
+	unsigned char in, out;
 	int i, j;
 
 	for (i = 0; i < length; i++) {
@@ -48,11 +48,11 @@ int main(int argc, char *argv[]) {
 	unsigned int features = FEATURES;
 	int name_len;
 	int key_len;
-	char key_trailer[8];
+	unsigned char key_trailer[8];
 	/* key checksum */
 	int checksum;
 	char name[MAXLEN + 1];
-	char key[9 + MAXLEN + 1 + 8];
+	unsigned char key[9 + MAXLEN + 1 + 8];
 	char out_key_text[(9 + MAXLEN + 1 + 8) * 2];
 	const char *short_opt = "f:a:";
 	int i;

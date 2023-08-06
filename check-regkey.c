@@ -35,7 +35,7 @@ static char ascii2nibble(char ascii) {
 	return nibble;
 }
 
-static void descramble(char *key, int length) {
+static void descramble(unsigned char *key, int length) {
 	char in, out;
 	int i, j;
 
@@ -52,13 +52,13 @@ static void descramble(char *key, int length) {
 }
 
 int main(int argc, char *argv[]) {
-	char key[9 + MAXLEN + 1 + 8];
+	unsigned char key[9 + MAXLEN + 1 + 8];
 	char *key_ascii;
 	int features;
 	int key_checksum, checksum;
-	char *key_name;
-	char *key_trailer;
-	char calc_key_trailer[8];
+	unsigned char *key_name;
+	unsigned char *key_trailer;
+	unsigned char calc_key_trailer[8];
 	int key_len;
 	int name_len;
 	int i, j;
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
 	checksum = calc_checksum(key, key_len);
 
 	/* calculate key trailer */
-	calc_name_check(calc_key_trailer, key_name);
+	calc_name_check(calc_key_trailer, (char *)key_name);
 
 	/* determine key name's length */
 	i = 0;
