@@ -85,26 +85,10 @@
 			FEATURE_ADV_DYNAMICS | FEATURE_DYN_SPEEDS | \
 			FEATURE_BIMP | FEATURE_STE_PROC
 
-static void show_features(unsigned int feat) {
+void show_features(unsigned int feat) {
 #define SHOW_FEATURE(a, b) \
 	if ((feat & a) == a) \
 		printf(" * (0x%08x) " b "\n", a);
-
-#define SHOW_FEATURE_MUT_EX(a, b, c) \
-	if ((feat & a) || (feat & b)) \
-		printf((feat & b) == b ? \
-			" * (0x%08x) " c " disabled\n" : \
-			" * (0x%08x) " c "\n", (feat & b) == 0 ? a : b);
-
-#define SHOW_FEATURE_ONLY(a, b, c) \
-	if ((feat & b) && !(feat & a)) \
-		printf(" * (0x%08x) " c " only\n", a);
-
-#define SHOW_FEATURE_COND(a, b, c) \
-	if (feat & a) \
-		printf((feat & b) == b ? \
-			" * (0x%08x) " c "\n" : \
-			" * (0x%08x) " c " disabled\n", a);
 
 /* for Dehummer only */
 #define SHOW_FEATURE_ALWAYS(a) \
@@ -131,11 +115,10 @@ static void show_features(unsigned int feat) {
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_5);
 	SHOW_FEATURE(FEATURE_NAT_DYN,		"Natural Dynamics (only)");
 	SHOW_FEATURE(FEATURE_FM_EVENT,		"Event FM Processing (3 days)");
-	SHOW_FEATURE(FEATURE_FM_PRO,		"FM Professional");
-	SHOW_FEATURE(FEATURE_FM_PRO_EVENT,	"FM Professional (Event FM)");
+	SHOW_FEATURE(FEATURE_FM_PRO,		"FM Professional (+ uMPX/uMPX+)");
+	SHOW_FEATURE(FEATURE_FM_PRO_EVENT,	"FM Professional (+ uMPX/uMPX+) (Event FM)");
 	SHOW_FEATURE(FEATURE_DELOSSIFIER,	"Delossifier");
-	SHOW_FEATURE_MUT_EX(FEATURE_FM_PRO,
-			FEATURE_UMPX,		"uMPX");
+	SHOW_FEATURE(FEATURE_UMPX,		"uMPX disabled");
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_6);
 	SHOW_FEATURE(FEATURE_ADV_DYNAMICS,	"Advanced Dynamics");
 	SHOW_FEATURE(FEATURE_DYN_SPEEDS,	"Dynamic Speeds (Advanced Dynamics)");
@@ -144,16 +127,46 @@ static void show_features(unsigned int feat) {
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_7);
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_8);
 	SHOW_FEATURE(FEATURE_STE_PROC,		"ST-Enterprise");
-	SHOW_FEATURE_MUT_EX(FEATURE_FM_PRO,
-			FEATURE_UMPXP,		"uMPX+");
+	SHOW_FEATURE(FEATURE_UMPXP,		"uMPX+ disabled");
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_9);
 	SHOW_FEATURE(FEATURE_PPM_WTRMRKNG,	"Nielsen PPM watermarking");
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_10);
 }
 
+void descramble(unsigned char *key, int length) {
+	char in, out;
+	int i, j;
+
+	for (i = 0; i < length; i++) {
+		in = key[i];
+		out = 0;
+		for (j = 0; j < 8; j++) {
+			out <<= 1;
+			out |= in & 1;
+			in >>= 1;
+		}
+		key[i] = out ^ (-1 - i - (1 << (1 << (i & 31) & 7)));
+	}
+}
+
+void scramble(unsigned char *key, int length) {
+	char in, out;
+	int i, j;
+
+	for (i = 0; i < length; i++) {
+		in = key[i] ^ (-1 - i - (1 << (1 << (i & 31) & 7)));
+		out = 0;
+		for (j = 0; j < 8; j++) {
+			out <<= 1;
+			out |= in & 1;
+			in >>= 1;
+		}
+		key[i] = out;
+	}
+}
+
 static int calc_checksum(unsigned char *key, int length) {
-	int checksum = 0;
-	int i;
+	int i, checksum = 0;
 
 	for (i = 0; i < length; i++) {
 		checksum = key[i] * 0x11121 + (checksum << 3);
@@ -179,4 +192,17 @@ static void calc_name_check(unsigned char *trailer, char *name) {
 	trailer[5] = 0;
 	trailer[6] = 0;
 	trailer[7] = 0;
+}
+
+char ascii2nibble(char ascii) {
+	char nibble = ascii;
+
+	if (ascii >= '0' && ascii <= '9')
+		nibble -= '0';
+	else if (ascii >= 'a' && ascii <= 'f')
+		nibble -= 'a' - 0xa;
+	else
+		nibble = 0;
+
+	return nibble;
 }

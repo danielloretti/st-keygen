@@ -27,22 +27,6 @@
 
 #include "st-common.h"
 
-static void scramble(unsigned char *key, int length) {
-	unsigned char in, out;
-	int i, j;
-
-	for (i = 0; i < length; i++) {
-		in = key[i] ^ (-1 - i - (1 << (1 << (i & 31) & 7)));
-		out = 0;
-		for (j = 0; j < 8; j++) {
-			out <<= 1;
-			out |= in & 1;
-			in >>= 1;
-		}
-		key[i] = out;
-	}
-}
-
 int main(int argc, char *argv[]) {
 	int opt;
 	unsigned int features = FEATURES;
