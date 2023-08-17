@@ -30,15 +30,15 @@
 #define UNKNOWN_2		0x00000100
 #define UNKNOWN_3		0x00000200
 #define UNKNOWN_4		0x00000400
-#define FEATURE_DECLIPPER	0x00000800 /* also enables nat dynamics */
-#define FEATURE_DECLIPPER_2H	0x00001000 /* also enables nat dynamics */
+#define FEATURE_DECLIPPER	0x00000800 /* also enables Natural Dynamics */
+#define FEATURE_DECLIPPER_2H	0x00001000 /* also enables Natural Dynamics */
 #define UNKNOWN_5		0x00002000
-#define FEATURE_NAT_DYN		0x00004000 /* not needed if Declipper is set */
+#define FEATURE_NAT_DYN		0x00004000 /* inverse effect if Declipper is set */
 #define FEATURE_FM_EVENT	0x00008000
-#define FEATURE_FM_PRO		0x00010000
-#define FEATURE_FM_PRO_EVENT	0x00020000
+#define FEATURE_FM_PRO		0x00010000 /* enables Orban composite clipper */
+#define FEATURE_FM_PRO_EVENT	0x00020000 /* enables Orban composite clipper */
 #define FEATURE_DELOSSIFIER	0x00040000
-#define FEATURE_UMPX		0x00080000 /* disabled when FM and this are set */
+#define FEATURE_UMPX		0x00080000 /* inverse effect if FM Pro is enabled */
 #define UNKNOWN_6		0x00100000
 #define FEATURE_ADV_DYNAMICS	0x00200000
 #define FEATURE_DYN_SPEEDS	0x00400000 /* Dynamic Speeds (Advanced Dynamics) */
@@ -47,7 +47,7 @@
 #define UNKNOWN_7		0x02000000
 #define UNKNOWN_8		0x04000000
 #define FEATURE_STE_PROC	0x08000000 /* ST-Enterprise */
-#define FEATURE_UMPXP		0x10000000 /* disabled when FM and this are set */
+#define FEATURE_UMPXP		0x10000000 /* inverse effect if FM Pro is enabled */
 #define UNKNOWN_9		0x20000000
 #define FEATURE_PPM_WTRMRKNG	0x40000000
 #define UNKNOWN_10		0x80000000
@@ -118,7 +118,7 @@ void show_features(unsigned int feat) {
 	SHOW_FEATURE(FEATURE_FM_PRO,		"FM Professional (+ uMPX/uMPX+)");
 	SHOW_FEATURE(FEATURE_FM_PRO_EVENT,	"FM Professional (+ uMPX/uMPX+) (Event FM)");
 	SHOW_FEATURE(FEATURE_DELOSSIFIER,	"Delossifier");
-	SHOW_FEATURE(FEATURE_UMPX,		"uMPX disabled");
+	SHOW_FEATURE(FEATURE_UMPX,		"uMPX");
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_6);
 	SHOW_FEATURE(FEATURE_ADV_DYNAMICS,	"Advanced Dynamics");
 	SHOW_FEATURE(FEATURE_DYN_SPEEDS,	"Dynamic Speeds (Advanced Dynamics)");
@@ -127,7 +127,7 @@ void show_features(unsigned int feat) {
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_7);
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_8);
 	SHOW_FEATURE(FEATURE_STE_PROC,		"ST-Enterprise");
-	SHOW_FEATURE(FEATURE_UMPXP,		"uMPX+ disabled");
+	SHOW_FEATURE(FEATURE_UMPXP,		"uMPX+");
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_9);
 	SHOW_FEATURE(FEATURE_PPM_WTRMRKNG,	"Nielsen PPM watermarking");
 	SHOW_FEATURE_UNKNOWN(UNKNOWN_10);
